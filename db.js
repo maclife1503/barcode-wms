@@ -11,8 +11,6 @@ const db = createClient({
 
 async function initDb() {
   await db.executeMultiple(`
-PRAGMA journal_mode = WAL;
-
 CREATE TABLE IF NOT EXISTS items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   package_id TEXT UNIQUE NOT NULL,
