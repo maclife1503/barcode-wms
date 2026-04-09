@@ -164,19 +164,20 @@ function todayKey() {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}${m}${day}`;
 }
-function nextPackageId() {
+async function nextPackageId() {
   const key = todayKey();
-  const row = db
-    .prepare(
-      `
+  const { rows } = await db.execute({
+    sql: `
     SELECT package_id
     FROM items
     WHERE package_id LIKE ?
     ORDER BY package_id DESC
     LIMIT 1
-  `
-    )
-    .get(`${key}%`);
+  `,
+    args: [`${key}%`]
+  });
+  
+  const row = rows[0];
 
   let nextSeq = 1;
   if (row?.package_id) {
@@ -221,17 +222,17 @@ app.post("/api/items", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Thiếu/không nhận diện được serial trong JSON." });
     }
 
-    const existed = db
-      .prepare(
-        `
+    const { rows: existRows } = await db.execute({
+      sql: `
       SELECT id, package_id, name, serial_clean
       FROM items
       WHERE serial_clean = ?
         AND is_deleted = 0
       LIMIT 1
-    `
-      )
-      .get(fields.serial_clean);
+    `,
+      args: [fields.serial_clean]
+    });
+    const existed = existRows[0];
 
     if (existed) {
       return res.status(409).json({
@@ -240,15 +241,15 @@ app.post("/api/items", requireAuth, async (req, res) => {
       });
     }
 
-    const package_id = nextPackageId();
+    const package_id = await nextPackageId();
     const token = genToken();
 
     const created_at = nowISO();
     const updated_at = created_at;
 
     try {
-      db.prepare(
-        `
+      await db.execute({
+        sql: `
         INSERT INTO items (
           package_id, token,
           name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
@@ -256,19 +257,18 @@ app.post("/api/items", requireAuth, async (req, res) => {
           created_at, updated_at,
           is_deleted, deleted_at, deleted_by
         ) VALUES (
-          @package_id, @token,
-          @name, @serial_raw, @serial_clean, @condition, @mvd, @note, @battery, @coverage,
+          ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?,
           'READY_TO_SHIP', 'UNKNOWN',
-          @created_at, @updated_at,
+          ?, ?,
           0, NULL, NULL
         )
-      `
-      ).run({
-        package_id,
-        token,
-        ...fields,
-        created_at,
-        updated_at,
+      `,
+        args: [
+          package_id, token,
+          fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
+          created_at, updated_at
+        ]
       });
     } catch (e) {
       if (String(e.message || "").toLowerCase().includes("unique")) {
@@ -277,7 +277,8 @@ app.post("/api/items", requireAuth, async (req, res) => {
       throw e;
     }
 
-    const item = db.prepare("SELECT * FROM items WHERE token = ?").get(token);
+    const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
+    const item = itemRows[0];
 
     const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(token)}`;
     const qrDataUrl = await QRCode.toDataURL(scanUrl, { margin: 0, width: 400 });
@@ -289,26 +290,26 @@ app.post("/api/items", requireAuth, async (req, res) => {
 });
 
 // ====== List/search ======
-app.get("/api/items", requireAuth, (req, res) => {
+app.get("/api/items", requireAuth, async (req, res) => {
   const { q = "", status = "", inventory = "" } = req.query;
   const like = `%${q}%`;
 
   const where = ["is_deleted = 0"];
-  const params = {};
+  const params = [];
 
   if (q) {
     where.push(
-      `(package_id LIKE @like OR name LIKE @like OR serial_clean LIKE @like OR tracking_code LIKE @like)`
+      `(package_id LIKE ? OR name LIKE ? OR serial_clean LIKE ? OR tracking_code LIKE ?)`
     );
-    params.like = like;
+    params.push(like, like, like, like);
   }
   if (status) {
-    where.push(`status = @status`);
-    params.status = status;
+    where.push(`status = ?`);
+    params.push(status);
   }
   if (inventory) {
-    where.push(`inventory_status = @inventory`);
-    params.inventory = inventory;
+    where.push(`inventory_status = ?`);
+    params.push(inventory);
   }
 
   const sql = `
@@ -319,24 +320,26 @@ app.get("/api/items", requireAuth, (req, res) => {
     LIMIT 500
   `;
 
-  const rows = db.prepare(sql).all(params);
+  const { rows } = await db.execute({ sql, args: params });
   res.json({ rows });
 });
 
 // ====== Scan: fetch by token ======
-app.get("/api/scan/:token", requireAuth, (req, res) => {
+app.get("/api/scan/:token", requireAuth, async (req, res) => {
   const { token } = req.params;
-  const item = db.prepare("SELECT * FROM items WHERE token = ?").get(token);
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
+  const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
   res.json({ item });
 });
 
 // ====== Inventory work ======
-app.post("/api/inventory/add", requireAuth, (req, res) => {
+app.post("/api/inventory/add", requireAuth, async (req, res) => {
   const { token } = req.body || {};
   if (!token) return res.status(400).json({ error: "Missing token" });
 
-  const item = db.prepare("SELECT * FROM items WHERE token = ?").get(token);
+  const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
+  const item = itemRows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
   if (item.is_deleted === 1 || item.status === "DELETED") {
     return res.status(400).json({ error: "Item is deleted" });
@@ -346,22 +349,23 @@ app.post("/api/inventory/add", requireAuth, (req, res) => {
   const scanned_at = nowISO();
 
   try {
-    db.prepare(
-      `
+    await db.execute({
+      sql: `
       INSERT INTO inventory_work(date_key, token, item_id, package_id, name, mvd, serial, actor, scanned_at)
       VALUES(?,?,?,?,?,?,?,?,?)
-    `
-    ).run(
-      date_key,
-      token,
-      item.id,
-      item.package_id || "",
-      item.name || "",
-      item.mvd || "",
-      item.serial_clean || item.serial_raw || "",
-      req.user,
-      scanned_at
-    );
+    `,
+      args: [
+        date_key,
+        token,
+        item.id,
+        item.package_id || "",
+        item.name || "",
+        item.mvd || "",
+        item.serial_clean || item.serial_raw || "",
+        req.user,
+        scanned_at
+      ]
+    });
 
     res.json({ ok: true });
   } catch (e) {
@@ -372,30 +376,29 @@ app.post("/api/inventory/add", requireAuth, (req, res) => {
   }
 });
 
-app.get("/api/inventory/today", requireAuth, (req, res) => {
+app.get("/api/inventory/today", requireAuth, async (req, res) => {
   const date_key = yyyymmddVN(new Date());
-  const rows = db
-    .prepare(
-      `
+  const { rows } = await db.execute({
+    sql: `
     SELECT package_id, name, serial, mvd, scanned_at, actor, token
     FROM inventory_work
     WHERE date_key = ?
     ORDER BY datetime(scanned_at) DESC
-  `
-    )
-    .all(date_key);
+  `,
+    args: [date_key]
+  });
 
   res.json({ date_key, rows });
 });
 
-app.delete("/api/inventory/exports/:id", requireAuth, requireAdmin, (req, res) => {
+app.delete("/api/inventory/exports/:id", requireAuth, requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
 
-  const row = db.prepare(`
-    SELECT id, filename
-    FROM inventory_exports
-    WHERE id = ?
-  `).get(id);
+  const { rows } = await db.execute({
+    sql: `SELECT id, filename FROM inventory_exports WHERE id = ?`,
+    args: [id]
+  });
+  const row = rows[0];
 
   if (!row) return res.status(404).json({ error: "Not found" });
 
@@ -408,26 +411,29 @@ app.delete("/api/inventory/exports/:id", requireAuth, requireAdmin, (req, res) =
     return res.status(500).json({ error: "Delete file failed" });
   }
 
-  db.prepare(`DELETE FROM inventory_exports WHERE id = ?`).run(id);
+  await db.execute({ sql: `DELETE FROM inventory_exports WHERE id = ?`, args: [id] });
   res.json({ ok: true });
 });
 
-app.post("/api/inventory/export", requireAuth, (req, res) => {
+app.post("/api/inventory/export", requireAuth, async (req, res) => {
   const date_key = yyyymmddVN(new Date());
 
-  const tx = db.transaction(() => {
-    const rows = db
-      .prepare(
-        `
+  try {
+    const tx = await db.transaction("write");
+    const { rows } = await tx.execute({
+      sql: `
       SELECT package_id, name, serial, mvd, scanned_at, actor
       FROM inventory_work
       WHERE date_key = ?
       ORDER BY datetime(scanned_at) DESC
-    `
-      )
-      .all(date_key);
+    `,
+      args: [date_key]
+    });
 
-    if (rows.length === 0) return { empty: true };
+    if (rows.length === 0) {
+      await tx.rollback();
+      return res.json({ ok: true, url: null, count: 0, message: "No data" });
+    }
 
     const header = ["time", "package_id", "mvd", "serial", "name", "actor"];
     const csv = [header.join(",")]
@@ -451,50 +457,50 @@ app.post("/api/inventory/export", requireAuth, (req, res) => {
     fs.writeFileSync(filePath, csv, "utf8");
 
     const url = `/exports/${filename}`;
-    db.prepare(
-      `
+    
+    await tx.execute({
+      sql: `
       INSERT INTO inventory_exports(date_key, actor, filename, url, row_count, created_at)
       VALUES(?,?,?,?,?,?)
-    `
-    ).run(date_key, req.user, filename, url, rows.length, nowISO());
+    `,
+      args: [date_key, req.user, filename, url, rows.length, nowISO()]
+    });
 
-    db.prepare(`DELETE FROM inventory_work WHERE date_key = ?`).run(date_key);
+    await tx.execute({
+      sql: `DELETE FROM inventory_work WHERE date_key = ?`, 
+      args: [date_key]
+    });
 
-    return { empty: false, url, count: rows.length, filename };
-  });
-
-  try {
-    const out = tx();
-    if (out.empty) return res.json({ ok: true, url: null, count: 0, message: "No data" });
-    res.json({ ok: true, url: out.url, count: out.count });
-  } catch {
+    await tx.commit();
+    res.json({ ok: true, url, count: rows.length, filename });
+  } catch (e) {
     res.status(500).json({ error: "Export failed" });
   }
 });
 
-app.get("/api/inventory/exports", requireAuth, (req, res) => {
-  const rows = db
-    .prepare(
-      `
+app.get("/api/inventory/exports", requireAuth, async (req, res) => {
+  const { rows } = await db.execute({
+    sql: `
     SELECT id, date_key, actor, filename, url, row_count, created_at
     FROM inventory_exports
     ORDER BY datetime(created_at) DESC
     LIMIT 200
   `
-    )
-    .all();
+  });
   res.json({ rows });
 });
 
 // ====== Update status (ship/henbin) ======
-app.post("/api/items/:id/status", requireAuth, (req, res) => {
+app.post("/api/items/:id/status", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { to_status } = req.body;
 
   const allowed = new Set(["READY_TO_SHIP", "SHIPPED", "HENBIN", "CREATED"]);
   if (!allowed.has(to_status)) return res.status(400).json({ error: "Invalid status" });
 
-  const item = db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
+  const item = rows[0];
+  
   if (!item) return res.status(404).json({ error: "Not found" });
   if (item.is_deleted === 1 || item.status === "DELETED") {
     return res.status(400).json({ error: "Item is deleted" });
@@ -503,57 +509,62 @@ app.post("/api/items/:id/status", requireAuth, (req, res) => {
   const from_status = item.status;
   const updated_at = nowISO();
 
-  db.prepare("UPDATE items SET status = ?, updated_at = ? WHERE id = ?").run(to_status, updated_at, id);
-  db.prepare(
-    `
+  await db.execute({ sql: "UPDATE items SET status = ?, updated_at = ? WHERE id = ?", args: [to_status, updated_at, id] });
+  await db.execute({
+    sql: `
     INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at)
     VALUES(?, ?, ?, ?, ?)
-  `
-  ).run(id, from_status, to_status, req.user, updated_at);
+  `,
+    args: [id, from_status, to_status, req.user, updated_at]
+  });
 
   res.json({ ok: true });
 });
 
 // ====== Inventory: In stock ======
-app.post("/api/items/:id/inventory", requireAuth, (req, res) => {
+app.post("/api/items/:id/inventory", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { inventory_status } = req.body;
 
   const allowed = new Set(["IN_STOCK", "NOT_IN_STOCK", "UNKNOWN"]);
   if (!allowed.has(inventory_status)) return res.status(400).json({ error: "Invalid inventory_status" });
 
-  const item = db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
+  const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
   if (item.is_deleted === 1 || item.status === "DELETED") {
     return res.status(400).json({ error: "Item is deleted" });
   }
 
   const t = nowISO();
-  db.prepare(
-    `
+  await db.execute({
+    sql: `
     UPDATE items
     SET inventory_status = ?,
         last_inventory_at = ?,
         last_inventory_by = ?,
         updated_at = ?
     WHERE id = ?
-  `
-  ).run(inventory_status, t, req.user, t, id);
+  `,
+    args: [inventory_status, t, req.user, t, id]
+  });
 
   if (inventory_status === "IN_STOCK" || inventory_status === "NOT_IN_STOCK") {
-    db.prepare(
-      `
+    await db.execute({
+      sql: `
       INSERT INTO inventory_logs(item_id, action, actor, created_at)
       VALUES(?, ?, ?, ?)
-    `
-    ).run(id, inventory_status, req.user, t);
+    `,
+      args: [id, inventory_status, req.user, t]
+    });
   }
 
   res.json({ ok: true });
 });
 
-app.post("/api/items/:id", requireAuth, (req, res) => {
-  const it = db.prepare("SELECT * FROM items WHERE id=?").get(req.params.id);
+app.post("/api/items/:id", requireAuth, async (req, res) => {
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id=?", args: [req.params.id] });
+  const it = rows[0];
   if (!it) return res.status(404).json({ error: "Not found" });
 
   const allowed = ["name", "serial_raw", "serial_clean", "condition", "mvd", "note", "battery", "coverage"];
@@ -566,40 +577,42 @@ app.post("/api/items/:id", requireAuth, (req, res) => {
   }
 
   const updated_at = nowISO();
-  db.prepare(
-    `
+  await db.execute({
+    sql: `
     UPDATE items SET
-      name=@name,
-      serial_raw=@serial_raw,
-      serial_clean=@serial_clean,
-      condition=@condition,
-      mvd=@mvd,
-      note=@note,
-      battery=@battery,
-      coverage=@coverage,
-      updated_at=@updated_at
-    WHERE id=@id
-  `
-  ).run({
-    id: req.params.id,
-    name: updates.name ?? it.name,
-    serial_raw: updates.serial_raw ?? it.serial_raw,
-    serial_clean: updates.serial_clean ?? it.serial_clean,
-    condition: updates.condition ?? it.condition,
-    mvd: updates.mvd ?? it.mvd,
-    note: updates.note ?? it.note,
-    battery: updates.battery ?? it.battery,
-    coverage: updates.coverage ?? it.coverage,
-    updated_at,
+      name=?,
+      serial_raw=?,
+      serial_clean=?,
+      condition=?,
+      mvd=?,
+      note=?,
+      battery=?,
+      coverage=?,
+      updated_at=?
+    WHERE id=?
+  `,
+    args: [
+      updates.name ?? it.name,
+      updates.serial_raw ?? it.serial_raw,
+      updates.serial_clean ?? it.serial_clean,
+      updates.condition ?? it.condition,
+      updates.mvd ?? it.mvd,
+      updates.note ?? it.note,
+      updates.battery ?? it.battery,
+      updates.coverage ?? it.coverage,
+      updated_at,
+      req.params.id
+    ]
   });
 
   if (Object.keys(changes).length) {
-    db.prepare(
-      `
+    await db.execute({
+      sql: `
       INSERT INTO edit_logs(item_id, actor, changes_json, created_at)
       VALUES(?,?,?,?)
-    `
-    ).run(req.params.id, req.user, JSON.stringify(changes), updated_at);
+    `,
+      args: [req.params.id, req.user, JSON.stringify(changes), updated_at]
+    });
   }
 
   res.json({ ok: true });
@@ -607,7 +620,8 @@ app.post("/api/items/:id", requireAuth, (req, res) => {
 
 app.get("/api/items/:id", requireAuth, async (req, res) => {
   const id = req.params.id;
-  const item = db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
+  const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(item.token)}`;
@@ -616,14 +630,15 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
   res.json({ item, scanUrl, qrDataUrl });
 });
 
-app.post("/api/items/:id/delete", requireAuth, requireAdmin, (req, res) => {
+app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) => {
   const id = req.params.id;
-  const item = db.prepare("SELECT id FROM items WHERE id=?").get(id);
+  const { rows } = await db.execute({ sql: "SELECT id FROM items WHERE id=?", args: [id] });
+  const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const t = nowISO();
-  db.prepare(
-    `
+  await db.execute({
+    sql: `
     UPDATE items
     SET is_deleted=1,
         status='DELETED',
@@ -631,8 +646,9 @@ app.post("/api/items/:id/delete", requireAuth, requireAdmin, (req, res) => {
         deleted_by=?,
         updated_at=?
     WHERE id=?
-  `
-  ).run(t, req.user, t, id);
+  `,
+    args: [t, req.user, t, id]
+  });
 
   res.json({ ok: true });
 });
@@ -641,55 +657,6 @@ app.get("/api/me", requireAuth, (req, res) => {
   res.json({ user: req.user, role: req.role });
 });
 
-// ====== Backup API (Telegram) ======
-app.get("/api/backup-database", async (req, res) => {
-  const { key } = req.query;
-  const secretKey = process.env.BACKUP_SECRET_KEY;
-  if (!secretKey || key !== secretKey) {
-    return res.status(403).json({ error: "Invalid or missing token" });
-  }
-
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!botToken || !chatId) {
-    return res.status(500).json({ error: "Telegram config missing" });
-  }
-
-  try {
-    const backupFile = `backup-${Date.now()}.sqlite`;
-    // Gọi lệnh backup an toàn của SQLite (gom tất cả dữ liệu từ WAL vào 1 file)
-    await db.backup(backupFile);
-
-    const fileBuffer = fs.readFileSync(backupFile);
-    const blob = new Blob([fileBuffer]);
-    const formData = new FormData();
-    formData.append("document", blob, `wms_${new Date().toISOString().slice(0, 10)}.sqlite`);
-    
-    const tgUrl = `https://api.telegram.org/bot${botToken}/sendDocument?chat_id=${chatId}&caption=Database Backup ${new Date().toISOString()}`;
-    
-    const response = await fetch(tgUrl, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-    
-    // Xoá file backup tạm
-    if (fs.existsSync(backupFile)) {
-      fs.unlinkSync(backupFile);
-    }
-
-    if (data.ok) {
-      res.json({ ok: true, message: "Backup sent successfully" });
-    } else {
-      console.error("TG API error:", data);
-      res.status(500).json({ error: "Telegram API error", detail: data });
-    }
-  } catch (err) {
-    console.error("Backup error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ====== Start server ======
 app.listen(3000, "0.0.0.0", () => {

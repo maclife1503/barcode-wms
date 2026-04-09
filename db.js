@@ -1,10 +1,16 @@
 // db.js
-const Database = require("better-sqlite3");
+const { createClient } = require("@libsql/client");
 
-const dbPath = process.env.DB_PATH || "wms.sqlite";
-const db = new Database(dbPath);
+const url = process.env.TURSO_DATABASE_URL || "file:wms.sqlite";
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
-db.exec(`
+const db = createClient({
+  url,
+  authToken
+});
+
+async function initDb() {
+  await db.executeMultiple(`
 PRAGMA journal_mode = WAL;
 
 CREATE TABLE IF NOT EXISTS items (
@@ -77,6 +83,9 @@ CREATE TABLE IF NOT EXISTS inventory_exports (
   row_count INTEGER NOT NULL,
   created_at TEXT NOT NULL
 );
-`);
+  `);
+}
+
+initDb().catch(console.error);
 
 module.exports = db;
