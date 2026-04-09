@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Login</title>
+</head>
+<body>
+  <h2>Pls login</h2>
+  <div class="card">
+    <div class="row">
+      <input id="u" placeholder="username" value=""/>
+      <input id="p" placeholder="password" type="password" value=""/>
+      <button onclick="login()">Login</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+<script>
+async function login(){
+  const r = await fetch("/api/login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ username: u.value, password: p.value })
+  });
+  const j = await r.json();
+  if(!r.ok){ msg.textContent = j.error || "Login failed"; return; }
+  location.href = "/create.html";
+}
+</script>
+</body>
+</html>

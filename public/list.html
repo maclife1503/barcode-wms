@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>List</title>
+</head>
+<body>
+  <div class="no-print topbar">
+  <div class="nav">
+    <a href="/create.html">Create</a>
+    <a href="/list.html">List</a>
+    <a href="/scan.html">Scan</a>
+    <a href="/inventory.html">Inventory</a>
+  </div>
+  <button class="logout-btn" onclick="logout()">Logout</button>
+</div>
+
+
+  <h2>Danh sách</h2>
+
+  <div class="card no-print">
+    <div class="row">
+      <input id="q" placeholder="Tìm: package_id / serial / tracking / name" style="width:320px" />
+      <select id="status">
+        <option value="">All status</option>
+        <option>READY_TO_SHIP</option>
+        <option>SHIPPED</option>
+        <option>RETURNED</option>
+        <option>CREATED</option>
+      </select>
+      <select id="inventory">
+        <option value="">All inventory</option>
+        <option>UNKNOWN</option>
+        <option>IN_STOCK</option>
+        <option>NOT_IN_STOCK</option>
+      </select>
+
+      <!-- Không cần nút Load nữa -->
+      <!-- <button onclick="load()">Load</button> -->
+    </div>
+  </div>
+
+  <div id="tbl"></div>
+
+<script>
+function esc(s){
+  return (s ?? "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
+}
+async function logout(){
+  await fetch("/api/logout",{method:"POST"});
+  location.href="/login.html";
+}
+async function load(){
+  const qEl = document.getElementById("q");
+  const statusEl = document.getElementById("status");
+  const inventoryEl = document.getElementById("inventory");
+  const tblEl = document.getElementById("tbl");
+
+  const u = new URL("/api/items", location.origin);
+  if (qEl.value) u.searchParams.set("q", qEl.value);
+  if (statusEl.value) u.searchParams.set("status", statusEl.value);
+  if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+
+  const r = await fetch(u);
+  const j = await r.json();
+  if(!r.ok){
+    tblEl.innerHTML = `<div class="card" style="color:#b00">${esc(j.error || "Load failed")}</div>`;
+    return;
+  }
+
+  tblEl.innerHTML = `
+    <div class="card table-wrap">
+      <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%">
+        <tr>
+          <th>Package</th><th>Name</th><th>Serial</th><th>MVD</th><th>Status</th><th>Inventory</th><th>Last inv</th>
+        </tr>
+        ${j.rows.map(r=>`
+          <tr>
+            <td><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
+            <td>${esc(r.name)}</td>
+            <td>${esc(r.serial_clean || "")}</td>
+            <td>${esc(r.mvd || "")}</td>
+            <td>${esc(r.status)}</td>
+            <td>${esc(r.inventory_status)}</td>
+            <td>${esc(r.last_inventory_at || "")}</td>
+          </tr>
+        `).join("")}
+      </table>
+    </div>
+  `;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const qEl = document.getElementById("q");
+  const statusEl = document.getElementById("status");
+  const inventoryEl = document.getElementById("inventory");
+
+  let debounceTimer = null;
+
+  // Gõ search: debounce 250ms
+  qEl.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(load, 250);
+  });
+
+  // Enter: load ngay
+  qEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") load();
+  });
+
+  // Đổi filter: load ngay
+  statusEl.addEventListener("change", load);
+  inventoryEl.addEventListener("change", load);
+
+  // Load lần đầu
+  load();
+});
+</script>
+</body>
+</html>

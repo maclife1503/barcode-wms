@@ -1,0 +1,7 @@
+.env
+wms.sqlite
+wms.sqlite-shm
+wms.sqlite-wal
+wms.sqlite-journal
+node_modules
+.DS_Store

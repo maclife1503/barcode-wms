@@ -1,0 +1,291 @@
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+
+:root{
+  --pad: 14px;
+  --gap: 12px;
+  --radius: 16px;
+  --border: #d7d7d7;
+  --bg: #ffffff;
+  --muted: #666;
+}
+
+html, body { height: 100%; }
+body{
+  margin: 0;
+  padding: var(--pad);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #fff;
+  color: #111;
+}
+
+/* Prevent iOS auto zoom on form controls */
+input, select, textarea, button{
+  font-size: 16px;
+}
+
+/* ===== Links/buttons ===== */
+a{
+  color: #1a73e8;
+  text-decoration: none;
+}
+a:hover{ text-decoration: underline; }
+
+button{
+  border: 1px solid var(--border);
+  background: #f2f2f2;
+  padding: 12px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+button:disabled{
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* ===== Layout helpers ===== */
+.row{
+  display: flex;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.card{
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+  margin: 12px 0;
+}
+
+.no-print {}
+
+/* ===== Topbar (Create / List / Scan + Logout) ===== */
+.topbar{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap);
+  margin-bottom: 12px;
+}
+.nav{
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.logout-btn{
+  padding: 10px 14px;
+  border-radius: 14px;
+  min-width: 110px;
+}
+
+/* ===== Pills ===== */
+.pills{ display:flex; gap:10px; flex-wrap:wrap; }
+.pill{
+  display:inline-block;
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:13px;
+}
+.pill-danger{
+  border-color:#f2a3a3;
+  background:#ffecec;
+  color:#8a0000;
+}
+
+/* ===== Forms ===== */
+label{ display:block; margin: 8px 0 6px; color: var(--muted); font-size: 13px; }
+
+input[type="text"], input[type="number"], input[type="date"], select, textarea{
+  width: 100%;
+  padding: 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  outline: none;
+  background: #fff;
+}
+textarea{
+  min-height: 160px;
+  resize: vertical;
+}
+
+/* ===== Table wrap (if you have tables) ===== */
+.table-wrap{
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ===== FORCE: text dọc bên trái QR (dùng đúng class left/right) ===== */
+.label{
+  width: 50mm !important;
+  height: 30mm !important;
+  padding: 2.2mm !important;
+  background: #fff !important;
+
+  display: grid !important;
+  grid-template-columns: 1fr 26mm !important;  /* trái text, phải QR */
+  gap: 2mm !important;
+  align-items: stretch !important;
+}
+
+/* Cột trái: bắt buộc xếp DỌC */
+.label .left{
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  gap: 0.8mm !important;
+  min-width: 0 !important;
+}
+
+/* đảm bảo từng dòng là block (không bị inline) */
+.label .left .mvd,
+.label .left .serial,
+.label .left .name{
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.label .mvd{
+  font-size: 10.5pt !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+}
+
+.label .serial{
+  font-size: 7.2pt !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.label .name{
+  font-size: 7.6pt !important;
+  line-height: 1.15 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+}
+
+/* Cột phải: QR to nhất */
+.label .right{
+  width: 26mm !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.label .qr{
+  width: 26mm !important;
+  height: 26mm !important;
+  object-fit: contain !important;
+  image-rendering: pixelated !important;
+}
+
+
+.photo-preview{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;        /* ✅ không cho tràn */
+}
+
+.photo-preview img{
+  max-width: 100%;         /* ✅ luôn nằm gọn trong card */
+  height: auto;
+  display: block;
+  border-radius: 14px;     /* tuỳ, có thể bỏ */
+  background: #fff;
+}
+
+.photo-hint{
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  margin-top: 8px;
+}
+/* ACTION BUTTONS: luôn nằm ngang */
+.scan-actions{
+  display:flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap;              /* nếu màn nhỏ sẽ xuống dòng */
+  gap: 10px;
+  align-items: center;
+}
+
+.scan-actions button{
+  width: auto !important;       /* chặn kiểu full-width */
+  flex: 0 0 auto;
+}
+/* Thu nhỏ vùng scan */
+.qr-reader{
+  width: 300px;
+  max-width: 200vw;
+  margin: 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* html5-qrcode đôi khi bọc nhiều div/canvas/video */
+#reader video, #reader canvas{
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 10px;
+}
+
+/* Hiệu ứng quét OK */
+.scan-ok{
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: all .2s ease;
+  font-weight: 700;
+  margin-top: 10px;
+  text-align: center;
+  color: #0a7a2f;
+}
+.scan-ok.show{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Flash nền nhẹ khi quét thành công */
+body.scan-success{
+  animation: flashOk .25s ease;
+}
+
+
+
+@keyframes flashOk{
+  0% { background: #ffffff; }
+  50%{ background: #eafff0; }
+  100%{ background: #ffffff; }
+}
+/* ===== Scan mode buttons ===== */
+.scan-actions button.active{
+  background: #111;
+  color: #fff;
+  border-color: #111;
+  font-weight: 900;
+}
+
+/* nếu bạn muốn mỗi mode 1 màu riêng (tuỳ chọn) */
+#modeShip.active{ background:#0a7a2f; border-color:#0a7a2f; color:#fff; }
+#modeReturn.active{ background:#b45309; border-color:#b45309; color:#fff; }
+#modeInv.active{ background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
+
+/* hover cho đẹp */
+.scan-actions button:hover{
+  filter: brightness(0.95);
+}
+
+body.scan-error { background: #ffecec; }

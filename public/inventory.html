@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Inventory Exports</title>
+</head>
+<body>
+  <div class="no-print topbar">
+    <div class="nav">
+      <a href="/create.html">Create</a>
+      <a href="/list.html">List</a>
+      <a href="/scan.html">Scan</a>
+      <a href="/inventory.html" class="active">Inventory</a>
+    </div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+
+  <h2>Inventory Exports (CSV)</h2>
+
+  <div class="scan-actions no-print" style="margin-bottom:10px; flex-wrap:wrap">
+    <button onclick="load()">Refresh</button>
+  </div>
+
+  <div id="status" class="card" style="padding:10px; margin-bottom:10px">
+    Status: page loaded
+  </div>
+
+  <div id="box"></div>
+
+<script>
+function esc(s){
+  return (s??"").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+}
+async function logout(){
+  await fetch("/api/logout",{method:"POST"});
+  location.href="/login.html";
+}
+
+function setStatus(msg){
+  document.getElementById("status").textContent = "Status: " + msg;
+}
+
+async function deleteExport(id, filename){
+  if(!confirm(`Xoá cứng file này?\n\n${filename}`)) return;
+
+  const r = await fetch(`/api/inventory/exports/${id}`, { method:"DELETE" });
+  const j = await r.json().catch(()=>({}));
+
+  if(!r.ok){
+    alert(j.error || `Delete failed (HTTP ${r.status})`);
+    return;
+  }
+
+  await load();
+}
+
+window.addEventListener("unhandledrejection", (e)=>{
+  setStatus("Promise error: " + (e?.reason?.message || e?.reason || "unknown"));
+});
+window.onerror = function(message, source, lineno, colno){
+  setStatus(`JS error: ${message} @${lineno}:${colno}`);
+};
+
+async function load(){
+  const box = document.getElementById("box");
+  setStatus("Loading /api/inventory/exports ...");
+  box.innerHTML = `<div class="card">Loading...</div>`;
+
+  try{
+    const r = await fetch("/api/inventory/exports", { cache: "no-store" });
+    const text = await r.text();
+
+    let j;
+    try{ j = JSON.parse(text); } catch { j = null; }
+
+    const rows = Array.isArray(j) ? j : (j?.rows || []);
+    setStatus(`HTTP ${r.status} `);
+
+    if(!r.ok){
+      box.innerHTML = `<div class="card">API error: ${esc(text)}</div>`;
+      return;
+    }
+
+    if(rows.length === 0){
+      box.innerHTML = `<div class="card">Chưa có file export nào.</div>`;
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="card">
+        <div style="font-weight:900; margin-bottom:10px">Danh sách file CSV đã xuất</div>
+        <div style="overflow:auto">
+          <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%; min-width:720px">
+            <tr>
+                <th>Date</th><th>File</th><th>By</th><th>Action</th>
+            </tr>
+            ${rows.map(x=>`
+              <tr>
+                <td>${esc(x.date_key)}</td>
+                <td><a href="${esc(x.url)}" target="_blank" download>${esc(x.filename)}</a></td>
+                <td>${esc(x.actor)}</td>
+                <td>
+                    <button onclick="deleteExport(${x.id}, '${esc(x.filename)}')" style="border:1px solid #f99;background:#fee">
+                        Delete
+                    </button>
+                </td>
+              </tr>
+            `).join("")}
+          </table>
+        </div>
+      </div>
+    `;
+  }catch(e){
+    setStatus("Render failed: " + (e?.message || e));
+    box.innerHTML = `<div class="card">Render failed: ${esc(e?.message || e)}</div>`;
+  }
+}
+
+window.addEventListener("load", load);
+</script>
+</body>
+</html>
