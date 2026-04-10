@@ -136,33 +136,19 @@ function csvCell(v) {
   return s;
 }
 function nowISO() {
-  return new Date().toISOString();
+  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Tokyo" }).replace(" ", "T");
 }
 function genToken() {
   return crypto.randomBytes(24).toString("hex");
 }
-function yyyymmddVN(d = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-
-  const y = parts.find((p) => p.type === "year").value;
-  const m = parts.find((p) => p.type === "month").value;
-  const day = parts.find((p) => p.type === "day").value;
-  return `${y}${m}${day}`;
+function yyyymmddLocal(d = new Date()) {
+  return d.toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" }).replace(/-/g, "");
 }
 function pad2(n) {
   return String(n).padStart(2, "0");
 }
 function todayKey() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}${m}${day}`;
+  return yyyymmddLocal();
 }
 async function nextPackageId() {
   const key = todayKey();
@@ -345,7 +331,7 @@ app.post("/api/inventory/add", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Item is deleted" });
   }
 
-  const date_key = yyyymmddVN(new Date());
+  const date_key = yyyymmddLocal();
   const scanned_at = nowISO();
 
   try {
@@ -377,7 +363,7 @@ app.post("/api/inventory/add", requireAuth, async (req, res) => {
 });
 
 app.get("/api/inventory/today", requireAuth, async (req, res) => {
-  const date_key = yyyymmddVN(new Date());
+  const date_key = yyyymmddLocal();
   const { rows } = await db.execute({
     sql: `
     SELECT package_id, name, serial, mvd, scanned_at, actor, token
@@ -416,7 +402,7 @@ app.delete("/api/inventory/exports/:id", requireAuth, requireAdmin, async (req, 
 });
 
 app.post("/api/inventory/export", requireAuth, async (req, res) => {
-  const date_key = yyyymmddVN(new Date());
+  const date_key = yyyymmddLocal();
 
   try {
     const tx = await db.transaction("write");
