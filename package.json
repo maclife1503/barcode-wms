@@ -14,10 +14,10 @@
   "dependencies": {
     "@libsql/client": "^0.17.2",
     "bcryptjs": "^3.0.3",
+    "bwip-js": "^4.9.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
-    "form-data": "^4.0.5",
-    "qrcode": "^1.5.4"
+    "form-data": "^4.0.5"
   }
 }
