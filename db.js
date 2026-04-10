@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS items (
 
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  created_by TEXT,
   is_deleted INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT,
   deleted_by TEXT

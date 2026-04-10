@@ -394,6 +394,9 @@ async function loadHistory() {
       icon = "✏️";
       const changes = JSON.parse(h.changes_json);
       content = `Sửa thông tin: ` + Object.keys(changes).map(k => `<span class="changes-tag">${esc(k)}</span>`).join("");
+    } else if (h.type === "created") {
+      icon = "🆕";
+      content = `<b>Đã tạo sản phẩm</b> (Mặc định: READY_TO_SHIP)`;
     }
 
     return `

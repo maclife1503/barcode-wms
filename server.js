@@ -301,32 +301,24 @@ app.post("/api/items", requireAuth, async (req, res) => {
     const package_id = await nextPackageId();
     const token = genToken();
 
-    const created_at = nowISO();
-    const updated_at = created_at;
-
-    try {
-      await db.execute({
-        sql: `
-        INSERT INTO items (
-          package_id, token,
-          name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
-          status, inventory_status,
-          created_at, updated_at,
-          is_deleted, deleted_at, deleted_by
-        ) VALUES (
-          ?, ?,
-          ?, ?, ?, ?, ?, ?, ?, ?,
-          'READY_TO_SHIP', 'UNKNOWN',
-          ?, ?,
-          0, NULL, NULL
-        )
-      `,
-        args: [
-          package_id, token,
-          fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
-          created_at, updated_at
-        ]
-      });
+    // ... insert ...
+    const t = nowISO();
+    await db.execute({
+      sql: `
+      INSERT INTO items (
+        package_id, token,
+        name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
+        status, inventory_status,
+        created_at, updated_at,
+        is_deleted, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?)
+    `,
+      args: [
+        package_id, token,
+        fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
+        t, t, req.user
+      ]
+    });
     } catch (e) {
       if (String(e.message || "").toLowerCase().includes("unique")) {
         return res.status(409).json({ error: "Đã có item này (serial trùng) và đang tồn tại." });
@@ -690,6 +682,10 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
 app.get("/api/items/:id/history", requireAuth, async (req, res) => {
   const id = req.params.id;
 
+  const { rows: itemRows } = await db.execute({ sql: "SELECT created_at, created_by FROM items WHERE id = ?", args: [id] });
+  const item = itemRows[0];
+  if (!item) return res.status(404).json({ error: "Not found" });
+
   const [statusLogs, invLogs, editLogs] = await Promise.all([
     db.execute({ sql: "SELECT 'status' as type, from_status, to_status, actor, created_at FROM status_logs WHERE item_id = ? ORDER BY created_at ASC", args: [id] }),
     db.execute({ sql: "SELECT 'inventory' as type, action, actor, created_at FROM inventory_logs WHERE item_id = ? ORDER BY created_at ASC", args: [id] }),
@@ -697,6 +693,7 @@ app.get("/api/items/:id/history", requireAuth, async (req, res) => {
   ]);
 
   const history = [
+    { type: 'created', actor: item.created_by || 'System', created_at: item.created_at },
     ...statusLogs.rows,
     ...invLogs.rows,
     ...editLogs.rows
