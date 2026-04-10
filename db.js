@@ -82,12 +82,14 @@ CREATE TABLE IF NOT EXISTS inventory_exports (
   row_count INTEGER NOT NULL,
   created_at TEXT NOT NULL
 );
+  `);
 
--- Thêm cột created_by vào bảng items nếu chưa có (Migration)
-try {
-  await db.execute("ALTER TABLE items ADD COLUMN created_by TEXT");
-} catch(e) { /* Cột đã tồn tại, bỏ qua */ }
+  // Migration: Thêm cột created_by vào bảng items nếu chưa có
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN created_by TEXT");
+  } catch(e) { /* ignore */ }
 
+  await db.executeMultiple(`
 CREATE TABLE IF NOT EXISTS edit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   item_id INTEGER NOT NULL,
