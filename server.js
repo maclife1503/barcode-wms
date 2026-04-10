@@ -303,22 +303,23 @@ app.post("/api/items", requireAuth, async (req, res) => {
 
     // ... insert ...
     const t = nowISO();
-    await db.execute({
-      sql: `
-      INSERT INTO items (
-        package_id, token,
-        name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
-        status, inventory_status,
-        created_at, updated_at,
-        is_deleted, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?)
-    `,
-      args: [
-        package_id, token,
-        fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
-        t, t, req.user
-      ]
-    });
+    try {
+      await db.execute({
+        sql: `
+        INSERT INTO items (
+          package_id, token,
+          name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
+          status, inventory_status,
+          created_at, updated_at,
+          is_deleted, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?)
+      `,
+        args: [
+          package_id, token,
+          fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
+          t, t, req.user
+        ]
+      });
     } catch (e) {
       if (String(e.message || "").toLowerCase().includes("unique")) {
         return res.status(409).json({ error: "Đã có item này (serial trùng) và đang tồn tại." });
