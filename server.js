@@ -281,7 +281,7 @@ app.post("/api/items", requireAuth, async (req, res) => {
     const item = itemRows[0];
 
     const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(token)}`;
-    const qrDataUrl = await QRCode.toDataURL(scanUrl, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
+    const qrDataUrl = await QRCode.toDataURL(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
 
     res.json({ item, scanUrl, qrDataUrl });
   } catch (e) {
@@ -625,7 +625,7 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(item.token)}`;
-  const qrDataUrl = await QRCode.toDataURL(scanUrl, { margin: 1, width: 600, errorCorrectionLevel: 'L' });
+  const qrDataUrl = await QRCode.toDataURL(item.token, { margin: 1, width: 600, errorCorrectionLevel: 'L' });
 
   res.json({ item, scanUrl, qrDataUrl });
 });
