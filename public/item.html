@@ -172,6 +172,14 @@ function esc(s){
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[m]));
 }
+function fmtTime(s) {
+  if (!s) return "-";
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleString();
+  } catch(e) { return s; }
+}
 
 async function logout(){
   await fetch("/api/logout",{method:"POST"});
@@ -283,7 +291,7 @@ async function loadItem(){
         </tr>
         <tr>
           <th style="background:#fafafa; text-align:left">Updated</th>
-          <td>${esc(it.updated_at || "-")}</td>
+          <td>${fmtTime(it.updated_at)}</td>
         </tr>
       </table>
     </div>

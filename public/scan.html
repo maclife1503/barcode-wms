@@ -55,6 +55,14 @@ async function logout(){
 function esc(s){
   return (s??"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
 }
+function fmtTime(s) {
+  if (!s) return "-";
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleString();
+  } catch(e) { return s; }
+}
 
 const itemBox = document.getElementById("itemBox");
 const invBox  = document.getElementById("invBox");
@@ -391,7 +399,7 @@ async function renderInvTable(){
               <td>${esc(r.name)}</td>
               <td>${esc(r.serial)}</td>
               <td>${esc(r.mvd)}</td>
-              <td>${esc(r.scanned_at)}</td>
+              <td>${fmtTime(r.scanned_at)}</td>
               <td>${esc(r.actor)}</td>
             </tr>
           `).join("")}

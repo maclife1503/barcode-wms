@@ -51,6 +51,14 @@ function esc(s){
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[m]));
 }
+function fmtTime(s) {
+  if (!s) return "-";
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleString();
+  } catch(e) { return s; }
+}
 async function logout(){
   await fetch("/api/logout",{method:"POST"});
   location.href="/login.html";
@@ -87,7 +95,7 @@ async function load(){
             <td>${esc(r.mvd || "")}</td>
             <td>${esc(r.status)}</td>
             <td>${esc(r.inventory_status)}</td>
-            <td>${esc(r.last_inventory_at || "")}</td>
+            <td>${fmtTime(r.last_inventory_at)}</td>
           </tr>
         `).join("")}
       </table>

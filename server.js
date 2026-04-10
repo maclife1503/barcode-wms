@@ -136,7 +136,9 @@ function csvCell(v) {
   return s;
 }
 function nowISO() {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Tokyo" }).replace(" ", "T");
+  const d = new Date();
+  const jst = d.toLocaleString("sv-SE", { timeZone: "Asia/Tokyo" }).replace(" ", "T");
+  return jst + "+09:00";
 }
 function genToken() {
   return crypto.randomBytes(24).toString("hex");
