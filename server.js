@@ -681,6 +681,9 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
   const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
 
+  const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(item.token)}`;
+  const qrDataUrl = await QRCode.toDataURL(item.token, { margin: 1, width: 600, errorCorrectionLevel: 'L' });
+
   res.json({ item, scanUrl, qrDataUrl });
 });
 
