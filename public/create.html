@@ -119,12 +119,10 @@ async function makeLabelPng({ mvd, serial, name, qrDataUrl, logoUrl = "/images/l
   const textW = leftW;
   const textH = leftH - logoBoxH - 4; // chừa thêm 4px cho thoáng
 
-  // vẽ Barcode (hình chữ nhật rộng, nằm chính giữa phần bên phải)
+  // vẽ QR
   const qrImg = await loadImage(qrDataUrl);
   ctx.imageSmoothingEnabled = false;
-  const bcHeight = 140; // Chiều cao Barcode
-  const bcY = qrY + (qrSize - bcHeight) / 2;
-  ctx.drawImage(qrImg, qrX, bcY, qrSize, bcHeight);
+  ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
   // ===== Text (clip để không xuống logo, không sang QR) =====
   ctx.save();

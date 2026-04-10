@@ -5,7 +5,7 @@ require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const bwipjs = require("bwip-js");
+const QRCode = require("qrcode");
 const crypto = require("crypto");
 const db = require("./db");
 
@@ -281,8 +281,7 @@ app.post("/api/items", requireAuth, async (req, res) => {
     const item = itemRows[0];
 
     const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(token)}`;
-    const buffer = await bwipjs.toBuffer({ bcid: "code128", text: token, scale: 3, height: 12, includetext: false });
-    const qrDataUrl = `data:image/png;base64,${buffer.toString("base64")}`;
+    const qrDataUrl = await QRCode.toDataURL(scanUrl, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
 
     res.json({ item, scanUrl, qrDataUrl });
   } catch (e) {
@@ -626,8 +625,7 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(item.token)}`;
-  const buffer = await bwipjs.toBuffer({ bcid: "code128", text: item.token, scale: 3, height: 12, includetext: false });
-  const qrDataUrl = `data:image/png;base64,${buffer.toString("base64")}`;
+  const qrDataUrl = await QRCode.toDataURL(scanUrl, { margin: 1, width: 600, errorCorrectionLevel: 'L' });
 
   res.json({ item, scanUrl, qrDataUrl });
 });

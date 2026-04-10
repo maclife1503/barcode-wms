@@ -198,9 +198,8 @@ async function startScan(){
       {
         fps: 20,
         qrbox: (vw, vh) => {
-          const w = Math.floor(vw * 0.9);
-          const h = Math.floor(Math.min(vh, vw) * 0.6);
-          return { width: w, height: h };
+          const s = Math.floor(Math.min(vw, vh) * 0.78);
+          return { width: s, height: s };
         },
         disableFlip: true,
         videoConstraints: {
