@@ -121,7 +121,7 @@ app.post("/api/login", async (req, res) => {
     httpOnly: true,
     sameSite: "lax",
   });
-  
+
   // Tự động kiểm tra hàng tồn quá hạn khi có người login (không block response)
   checkStaleItemsAndNotify().catch(e => console.error("Auto check failed:", e));
 
@@ -157,11 +157,11 @@ function todayKey() {
   return yyyymmddLocal();
 }
 function fmtTimeLocal(iso) {
-  if(!iso) return "-";
+  if (!iso) return "-";
   try {
     const d = new Date(iso);
     return d.toLocaleString("vi-VN", { timeZone: "Asia/Tokyo" });
-  } catch(e) { return iso; }
+  } catch (e) { return iso; }
 }
 
 // ====== Telegram Alerts ======
@@ -188,7 +188,7 @@ async function sendTelegramMessage(text) {
 
 async function checkStaleItemsAndNotify(isManual = false) {
   const today = todayKey();
-  
+
   // Kiểm tra xem hôm nay đã gửi chưa (nếu không phải gửi thủ công)
   if (!isManual) {
     const { rows } = await db.execute({ sql: "SELECT value FROM kv_store WHERE key = 'last_stale_alert_date'", args: [] });
@@ -215,12 +215,12 @@ async function checkStaleItemsAndNotify(isManual = false) {
   if (staleItems.length > 0) {
     let msg = `⚠️ <b>CẢNH BÁO HÀNG TỒN > 15 NGÀY</b>\n\n`;
     staleItems.forEach((it, i) => {
-      msg += `${i + 1}. <code>${it.package_id}</code> - ${it.name}\n   (Tồn: ${Math.floor((new Date() - new Date(it.created_at))/(1000*60*60*24))} ngày)\n`;
+      msg += `${i + 1}. <code>${it.package_id}</code> - ${it.name}\n   (Tồn: ${Math.floor((new Date() - new Date(it.created_at)) / (1000 * 60 * 60 * 24))} ngày)\n`;
     });
     msg += `\n👉 <a href="${process.env.APP_URL || ''}/list.html">Xem danh sách đầy đủ</a>`;
-    
+
     await sendTelegramMessage(msg);
-    
+
     // Lưu lại ngày đã gửi
     await db.execute({
       sql: "INSERT OR REPLACE INTO kv_store (key, value) VALUES ('last_stale_alert_date', ?)",
@@ -240,7 +240,7 @@ async function nextPackageId() {
   `,
     args: [`${key}%`]
   });
-  
+
   const row = rows[0];
 
   let nextSeq = 1;
@@ -472,6 +472,18 @@ app.delete("/api/inventory/exports/:id", requireAuth, requireAdmin, async (req, 
   res.json({ ok: true });
 });
 
+app.post("/api/inventory/reset", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await db.execute({
+      sql: `UPDATE items SET inventory_status = 'UNKNOWN', last_inventory_at = NULL WHERE is_deleted = 0`,
+      args: []
+    });
+    res.json({ ok: true, message: "Đã reset toàn bộ trạng thái kiểm kho về UNKNOWN." });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/inventory/export", requireAuth, async (req, res) => {
   const date_key = yyyymmddLocal();
 
@@ -514,7 +526,7 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
     fs.writeFileSync(filePath, csv, "utf8");
 
     const url = `/exports/${filename}`;
-    
+
     await tx.execute({
       sql: `
       INSERT INTO inventory_exports(date_key, actor, filename, url, row_count, created_at)
@@ -524,7 +536,7 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
     });
 
     await tx.execute({
-      sql: `DELETE FROM inventory_work WHERE date_key = ?`, 
+      sql: `DELETE FROM inventory_work WHERE date_key = ?`,
       args: [date_key]
     });
 
@@ -557,7 +569,7 @@ app.post("/api/items/:id/status", requireAuth, async (req, res) => {
 
   const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
   const item = rows[0];
-  
+
   if (!item) return res.status(404).json({ error: "Not found" });
   if (item.is_deleted === 1 || item.status === "DELETED") {
     return res.status(400).json({ error: "Item is deleted" });
@@ -760,10 +772,10 @@ app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) =>
 
   // Gửi thông báo Telegram
   const msg = `🗑️ <b>SẢN PHẨM ĐÃ BỊ XÓA</b>\n\n` +
-              `📦 Mã: <code>${item.package_id}</code>\n` +
-              `🏷️ Tên: ${item.name}\n` +
-              `👤 Người xóa: ${req.user}\n` +
-              `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+    `📦 Mã: <code>${item.package_id}</code>\n` +
+    `🏷️ Tên: ${item.name}\n` +
+    `👤 Người xóa: ${req.user}\n` +
+    `⏰ Thời gian: ${fmtTimeLocal(t)}`;
   sendTelegramMessage(msg).catch(e => console.error("Notify delete failed:", e));
 
   res.json({ ok: true });

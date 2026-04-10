@@ -384,7 +384,7 @@ async function renderInvTable(){
         <div style="font-weight:900">Inventory bảng hôm nay</div>
         <div class="scan-actions no-print" style="flex-wrap:wrap">
           <button onclick="downloadInvCsv()">Xuất CSV</button>
-          <button onclick="clearInvToday()" style="border:1px solid #f99;background:#fee">Clear hôm nay</button>
+          <button onclick="resetInventory()" style="border:1px solid #ff9800;background:#fff3e0;color:#e65100">Reset inventory</button>
         </div>
       </div>
 
@@ -412,10 +412,16 @@ async function renderInvTable(){
   `;
 }
 
-async function clearInvToday(){
-  if(!confirm("Xoá toàn bộ bảng kiểm kê của hôm nay?")) return;
-  await apiClearInvToday();
-  await renderInvTable();
+async function resetInventory(){
+  if(!confirm("Đưa toàn bộ trạng thái Inventory của tất cả sản phẩm về UNKNOWN? (Lưu ý: Thao tác này KHÔNG xoá bảng bên dưới)")) return;
+  const r = await fetch("/api/inventory/reset", { method:"POST" });
+  if(!r.ok){
+    const j = await r.json().catch(()=>({}));
+    alert(j.error || "Reset failed");
+    return;
+  }
+  alert("Đã reset tất cả về UNKNOWN");
+  if(MODE === "INVENTORY") await renderInvTable();
 }
 
 async function downloadInvCsv(){
