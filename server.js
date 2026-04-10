@@ -156,6 +156,13 @@ function pad2(n) {
 function todayKey() {
   return yyyymmddLocal();
 }
+function fmtTimeLocal(iso) {
+  if(!iso) return "-";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("vi-VN", { timeZone: "Asia/Tokyo" });
+  } catch(e) { return iso; }
+}
 
 // ====== Telegram Alerts ======
 async function sendTelegramMessage(text) {
@@ -733,7 +740,7 @@ app.post("/api/telegram/notify-stale-manual", requireAuth, requireAdmin, async (
 
 app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) => {
   const id = req.params.id;
-  const { rows } = await db.execute({ sql: "SELECT id FROM items WHERE id=?", args: [id] });
+  const { rows } = await db.execute({ sql: "SELECT id, package_id, name FROM items WHERE id=?", args: [id] });
   const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
 
@@ -750,6 +757,14 @@ app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) =>
   `,
     args: [t, req.user, t, id]
   });
+
+  // Gửi thông báo Telegram
+  const msg = `🗑️ <b>SẢN PHẨM ĐÃ BỊ XÓA</b>\n\n` +
+              `📦 Mã: <code>${item.package_id}</code>\n` +
+              `🏷️ Tên: ${item.name}\n` +
+              `👤 Người xóa: ${req.user}\n` +
+              `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+  sendTelegramMessage(msg).catch(e => console.error("Notify delete failed:", e));
 
   res.json({ ok: true });
 });
