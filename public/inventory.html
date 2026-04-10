@@ -21,6 +21,8 @@
 
   <div class="scan-actions no-print" style="margin-bottom:10px; flex-wrap:wrap">
     <button onclick="load()">Refresh</button>
+    <button onclick="testTelegram()" style="background:#e3f2fd; border-color:#2196f3; color:#1565c0">Test Telegram 🚀</button>
+    <button onclick="notifyStale()" style="background:#fff3e0; border-color:#ff9800; color:#e65100">Báo cáo tồn >15 ngày ⚠️</button>
   </div>
 
   <div id="status" class="card" style="padding:10px; margin-bottom:10px">
@@ -40,6 +42,32 @@ async function logout(){
 
 function setStatus(msg){
   document.getElementById("status").textContent = "Status: " + msg;
+}
+
+async function testTelegram() {
+  if(!confirm("Gửi thử một tin nhắn chào mừng đến Telegram của bạn?")) return;
+  const { ok, status, json } = await apiJson("/api/telegram/test", { method: "POST" });
+  if(!ok) {
+    alert(json.error || "Gửi thất bại");
+  } else {
+    alert(json.message);
+  }
+}
+
+async function notifyStale() {
+  if(!confirm("Kích hoạt quét hàng tồn > 15 ngày và gửi báo cáo về Telegram?")) return;
+  const { ok, status, json } = await apiJson("/api/telegram/notify-stale-manual", { method: "POST" });
+  if(!ok) {
+    alert(json.error || "Gửi thất bại");
+  } else {
+    alert(json.message);
+  }
+}
+
+async function apiJson(url, options){
+  const r = await fetch(url, options);
+  const j = await r.json().catch(()=> ({}));
+  return { ok: r.ok, status: r.status, json: j };
 }
 
 async function deleteExport(id, filename){

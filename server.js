@@ -702,6 +702,34 @@ app.get("/api/items/:id/history", requireAuth, async (req, res) => {
   res.json({ history });
 });
 
+// ====== Telegram Test API ======
+app.post("/api/telegram/test", requireAuth, requireAdmin, async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId) {
+    return res.status(400).json({ error: "Thiếu cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID trên Render." });
+  }
+
+  try {
+    const text = `🚀 <b>KẾT NỐI THÀNH CÔNG!</b>\n\nHệ thống WMS đã kết nối được với Telegram của bạn.\nThời gian: ${nowISO()}`;
+    await sendTelegramMessage(text);
+    res.json({ ok: true, message: "Đã gửi tin nhắn test thành công!" });
+  } catch (e) {
+    res.status(500).json({ error: "Gửi thất bại: " + e.message });
+  }
+});
+
+// API Chạy tay báo cáo hàng tồn (dành cho Admin)
+app.post("/api/telegram/notify-stale-manual", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await checkStaleItemsAndNotify(true);
+    res.json({ ok: true, message: "Đã kích hoạt quét hàng tồn và gửi qua Telegram." });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) => {
   const id = req.params.id;
   const { rows } = await db.execute({ sql: "SELECT id FROM items WHERE id=?", args: [id] });
