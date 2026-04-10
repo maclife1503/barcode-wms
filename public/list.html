@@ -85,19 +85,25 @@ async function load(){
     <div class="card table-wrap">
       <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%">
         <tr>
-          <th>Package</th><th>Name</th><th>Serial</th><th>MVD</th><th>Status</th><th>Inventory</th><th>Last inv</th>
+          <th>Package</th><th>Name</th><th>Serial</th><th>MVD</th><th>Status</th><th>Inventory</th><th>Stock Days</th>
         </tr>
-        ${j.rows.map(r=>`
-          <tr>
-            <td><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
+        ${j.rows.map(r=>{
+          const diff = Math.ceil((new Date() - new Date(r.created_at)) / (1000 * 60 * 60 * 24));
+          const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
+          return `
+          <tr style="${isStale ? 'background:#fff5f5; color:#b00' : ''}">
+            <td><a href="/item.html?id=${r.id}" style="${isStale ? 'color:#b00; font-weight:bold' : ''}">${esc(r.package_id)}</a></td>
             <td>${esc(r.name)}</td>
             <td>${esc(r.serial_clean || "")}</td>
             <td>${esc(r.mvd || "")}</td>
             <td>${esc(r.status)}</td>
             <td>${esc(r.inventory_status)}</td>
-            <td>${fmtTime(r.last_inventory_at)}</td>
+            <td>
+              ${diff} d
+              ${isStale ? ' ⚠️' : ''}
+            </td>
           </tr>
-        `).join("")}
+        `}).join("")}
       </table>
     </div>
   `;

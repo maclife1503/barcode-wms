@@ -20,6 +20,58 @@
   <h2>Item detail</h2>
   <div id="box"></div>
 
+  <div id="timelineContainer" style="display:none; margin-top:20px;">
+    <h3>Lịch sử hoạt động</h3>
+    <div id="timeline" class="card" style="padding: 20px; position:relative;"></div>
+  </div>
+
+  <style>
+    /* Timeline styles */
+    .timeline-item {
+      position: relative;
+      padding-left: 30px;
+      padding-bottom: 20px;
+      border-left: 2px solid #e0e0e0;
+      margin-left: 10px;
+    }
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -7px;
+      top: 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #1a73e8;
+      border: 2px solid #fff;
+    }
+    .timeline-item:last-child {
+      border-left: none;
+      padding-bottom: 0;
+    }
+    .timeline-time {
+      font-size: 12px;
+      color: #777;
+      margin-bottom: 4px;
+    }
+    .timeline-content {
+      font-size: 14px;
+    }
+    .timeline-actor {
+      font-weight: bold;
+      color: #333;
+    }
+    .changes-tag {
+      display: inline-block;
+      font-size: 11px;
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+      margin-right: 4px;
+    }
+  </style>
+
 <script>
 /* ======= COPY Y HỆT từ create.html ======= */
 const LABEL_W = 548; // px (30mm @ 300dpi)
@@ -251,9 +303,16 @@ async function loadItem(){
   const role = meRes.ok ? meRes.json.role : "staff";
   const showDelete = role === "admin";
 
+  // Calculate days in stock
+  const createdDate = new Date(it.created_at);
+  const now = new Date();
+  const diffTime = Math.abs(now - createdDate);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const staleWarning = diffDays > 15 ? `<div style="color:#d00; font-weight:800; margin-top:4px;">⚠️ Hàng đã lưu kho ${diffDays} ngày (Quá hạn 15 ngày)</div>` : "";
+
   box.innerHTML = `
   <div class="card">
-
+    ${staleWarning}
     <!-- ACTIONS 1 HÀNG -->
     <div class="scan-actions no-print" style="margin-bottom:12px; flex-wrap:wrap">
       <button onclick="setStatus('SHIPPED')">Đã ship</button>
@@ -308,6 +367,51 @@ setTimeout(renderLabel, 0);
 
 }
 
+async function loadHistory() {
+  const { ok, json } = await apiJson(`/api/items/${encodeURIComponent(id)}/history`);
+  if (!ok) return;
+
+  const container = document.getElementById("timelineContainer");
+  const timeline = document.getElementById("timeline");
+  container.style.display = "block";
+
+  if (json.history.length === 0) {
+    timeline.innerHTML = "Chưa có lịch sử hoạt động.";
+    return;
+  }
+
+  timeline.innerHTML = json.history.map(h => {
+    let content = "";
+    let icon = "🔵";
+
+    if (h.type === "status") {
+      icon = "🚚";
+      content = `Thay đổi trạng thái: <b>${esc(h.from_status)}</b> ➔ <b>${esc(h.to_status)}</b>`;
+    } else if (h.type === "inventory") {
+      icon = "📦";
+      content = `Kiểm kho: <b>${esc(h.action)}</b>`;
+    } else if (h.type === "edit") {
+      icon = "✏️";
+      const changes = JSON.parse(h.changes_json);
+      content = `Sửa thông tin: ` + Object.keys(changes).map(k => `<span class="changes-tag">${esc(k)}</span>`).join("");
+    }
+
+    return `
+      <div class="timeline-item">
+        <div class="timeline-time">${fmtTime(h.created_at)}</div>
+        <div class="timeline-content">
+          ${icon} <span class="timeline-actor">${esc(h.actor)}</span>: ${content}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function loadAll(){
+  await loadItem();
+  await loadHistory();
+}
+
 async function setStatus(to_status){
   const { ok, status, json } = await apiJson(`/api/items/${encodeURIComponent(id)}/status`, {
     method:"POST",
@@ -315,7 +419,7 @@ async function setStatus(to_status){
     body: JSON.stringify({ to_status })
   });
   if(!ok){ alert(json.error || `Update failed (HTTP ${status})`); return; }
-  await loadItem();
+  await loadAll();
 }
 
 async function setInventory(inventory_status){
@@ -325,10 +429,10 @@ async function setInventory(inventory_status){
     body: JSON.stringify({ inventory_status })
   });
   if(!ok){ alert(json.error || `Update failed (HTTP ${status})`); return; }
-  await loadItem();
+  await loadAll();
 }
 
-loadItem();
+loadAll();
 </script>
 </body>
 </html>

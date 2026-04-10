@@ -81,6 +81,20 @@ CREATE TABLE IF NOT EXISTS inventory_exports (
   row_count INTEGER NOT NULL,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS edit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  actor TEXT,
+  changes_json TEXT NOT NULL, -- JSON string mô tả các trường bị đổi
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(item_id) REFERENCES items(id)
+);
+
+CREATE TABLE IF NOT EXISTS kv_store (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
   `);
 }
 

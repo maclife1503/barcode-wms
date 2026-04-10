@@ -121,6 +121,10 @@ app.post("/api/login", async (req, res) => {
     httpOnly: true,
     sameSite: "lax",
   });
+  
+  // Tự động kiểm tra hàng tồn quá hạn khi có người login (không block response)
+  checkStaleItemsAndNotify().catch(e => console.error("Auto check failed:", e));
+
   res.json({ ok: true });
 });
 
@@ -151,6 +155,71 @@ function pad2(n) {
 }
 function todayKey() {
   return yyyymmddLocal();
+}
+
+// ====== Telegram Alerts ======
+async function sendTelegramMessage(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML"
+      })
+    });
+  } catch (e) {
+    console.error("Telegram send failed:", e);
+  }
+}
+
+async function checkStaleItemsAndNotify(isManual = false) {
+  const today = todayKey();
+  
+  // Kiểm tra xem hôm nay đã gửi chưa (nếu không phải gửi thủ công)
+  if (!isManual) {
+    const { rows } = await db.execute({ sql: "SELECT value FROM kv_store WHERE key = 'last_stale_alert_date'", args: [] });
+    if (rows[0]?.value === today) return;
+  }
+
+  // Tìm hàng tồn > 15 ngày (READY_TO_SHIP hoặc CREATED)
+  // Tính 15 ngày trước từ giờ Nhật Bản
+  const staleDate = new Date(new Date().getTime() + 9 * 60 * 60 * 1000 - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const { rows: staleItems } = await db.execute({
+    sql: `
+      SELECT package_id, name, created_at
+      FROM items
+      WHERE is_deleted = 0
+        AND status IN ('READY_TO_SHIP', 'CREATED')
+        AND substr(created_at, 1, 10) < ?
+      ORDER BY created_at ASC
+      LIMIT 20
+    `,
+    args: [staleDate]
+  });
+
+  if (staleItems.length > 0) {
+    let msg = `⚠️ <b>CẢNH BÁO HÀNG TỒN > 15 NGÀY</b>\n\n`;
+    staleItems.forEach((it, i) => {
+      msg += `${i + 1}. <code>${it.package_id}</code> - ${it.name}\n   (Tồn: ${Math.floor((new Date() - new Date(it.created_at))/(1000*60*60*24))} ngày)\n`;
+    });
+    msg += `\n👉 <a href="${process.env.APP_URL || ''}/list.html">Xem danh sách đầy đủ</a>`;
+    
+    await sendTelegramMessage(msg);
+    
+    // Lưu lại ngày đã gửi
+    await db.execute({
+      sql: "INSERT OR REPLACE INTO kv_store (key, value) VALUES ('last_stale_alert_date', ?)",
+      args: [today]
+    });
+  }
 }
 async function nextPackageId() {
   const key = todayKey();
@@ -301,7 +370,7 @@ app.get("/api/items", requireAuth, async (req, res) => {
   }
 
   const sql = `
-    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at
+    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at
     FROM items
     WHERE ${where.join(" AND ")}
     ORDER BY datetime(updated_at) DESC
@@ -612,10 +681,25 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
   const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
 
-  const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(item.token)}`;
-  const qrDataUrl = await QRCode.toDataURL(item.token, { margin: 1, width: 600, errorCorrectionLevel: 'L' });
-
   res.json({ item, scanUrl, qrDataUrl });
+});
+
+app.get("/api/items/:id/history", requireAuth, async (req, res) => {
+  const id = req.params.id;
+
+  const [statusLogs, invLogs, editLogs] = await Promise.all([
+    db.execute({ sql: "SELECT 'status' as type, from_status, to_status, actor, created_at FROM status_logs WHERE item_id = ? ORDER BY created_at ASC", args: [id] }),
+    db.execute({ sql: "SELECT 'inventory' as type, action, actor, created_at FROM inventory_logs WHERE item_id = ? ORDER BY created_at ASC", args: [id] }),
+    db.execute({ sql: "SELECT 'edit' as type, changes_json, actor, created_at FROM edit_logs WHERE item_id = ? ORDER BY created_at ASC", args: [id] })
+  ]);
+
+  const history = [
+    ...statusLogs.rows,
+    ...invLogs.rows,
+    ...editLogs.rows
+  ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  res.json({ history });
 });
 
 app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) => {
