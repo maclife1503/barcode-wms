@@ -370,7 +370,7 @@ app.get("/api/items", requireAuth, async (req, res) => {
   }
 
   const sql = `
-    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at
+    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at, updated_at
     FROM items
     WHERE ${where.join(" AND ")}
     ORDER BY datetime(updated_at) DESC
