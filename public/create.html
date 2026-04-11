@@ -26,6 +26,7 @@
 
     <div class="scan-actions" style="margin-top:12px">
         <button id="createBtn" onclick="createItem()">Tạo</button>
+        <button id="pasteBtn" type="button" onclick="pasteJson()" style="background:#e8f0fe; border-color:#1a73e8; color:#1a73e8">Paste 📋</button>
         <button id="clearBtn" type="button" onclick="clearJson()">Clear</button>
         <div id="err" style="margin-top:10px;color:#A40000"></div>
     </div>
@@ -203,6 +204,16 @@ function clearJson(){
   photoBox.innerHTML = "";
   lastLabel = null;
   raw.focus();
+}
+
+async function pasteJson(){
+  try {
+    const text = await navigator.clipboard.readText();
+    raw.value = text;
+    err.textContent = "";
+  } catch (e) {
+    err.textContent = "Không thể truy cập bộ nhớ tạm. Hãy cấp quyền dán cho trình duyệt.";
+  }
 }
 
 photoBox.innerHTML = ""
