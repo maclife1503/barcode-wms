@@ -54,6 +54,14 @@ async function logout(){
 }
 
 async function loadCategories() {
+  // Kiểm tra quyền Admin
+  const meRes = await fetch("/api/me");
+  const me = await meRes.json();
+  if (me.role !== 'admin') {
+    location.href = "/list.html";
+    return;
+  }
+
   const r = await fetch("/api/categories");
   const j = await r.json();
   if (!r.ok) return alert("Lỗi load categories");

@@ -15,7 +15,7 @@
       <a href="/list.html">List</a>
       <a href="/scan.html">Scan</a>
       <a href="/inventory.html">Inventory</a>
-      <a href="/settings.html">Settings</a>
+      <a href="/settings.html" id="navSettings" style="display:none">Settings</a>
     </div>
     <button class="logout-btn" onclick="logout()">Logout | Login</button>
   </div>
@@ -193,6 +193,16 @@
       await fetch("/api/logout", { method: "POST" });
       location.href = "/login.html";
     }
+
+    async function checkAdmin() {
+      const r = await fetch("/api/me");
+      const j = await r.json();
+      if (j.role === 'admin') {
+        const nav = document.getElementById("navSettings");
+        if (nav) nav.style.display = "inline-block";
+      }
+    }
+    checkAdmin();
 
     function esc(s) { return (s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
     const raw = document.getElementById("raw");
