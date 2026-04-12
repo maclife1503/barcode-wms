@@ -124,7 +124,34 @@ CREATE TABLE IF NOT EXISTS kv_store (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS category_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  keywords TEXT NOT NULL -- dấu phẩy cách nhau
+);
   `);
+
+  // Seed dữ liệu khởi tạo cho category_rules nếu bảng trống
+  try {
+    const { rows } = await db.execute("SELECT count(*) as count FROM category_rules");
+    if (rows[0].count === 0) {
+      const initialRules = [
+        ['ipad', 'ipad'],
+        ['keyboard', 'magic,keyboard,key'],
+        ['apple_watch', 'aw,apple watch'],
+        ['pencil', 'pen,pencil'],
+        ['macbook', 'mac,macbook,imac'],
+        ['iphone', 'iphone']
+      ];
+      for (const [name, kw] of initialRules) {
+        await db.execute({
+          sql: "INSERT INTO category_rules (name, keywords) VALUES (?, ?)",
+          args: [name, kw]
+        });
+      }
+    }
+  } catch(e) { console.error("Seeding categories failed:", e); }
 }
 
 initDb().catch(console.error);

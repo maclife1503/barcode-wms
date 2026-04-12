@@ -140,14 +140,28 @@ function csvCell(v) {
   return s;
 }
 
+let cachedCategories = [];
+async function loadCategories() {
+  try {
+    const { rows } = await db.execute("SELECT * FROM category_rules ORDER BY id ASC");
+    cachedCategories = rows.map(r => ({
+      name: r.name,
+      keywords: r.keywords.split(",").map(k => k.trim().toLowerCase()).filter(Boolean)
+    }));
+  } catch (e) {
+    console.error("Failed to load categories:", e);
+  }
+}
+// Load ngay khi khởi động
+loadCategories();
+
 function detectCategory(name) {
   const n = (name || "").toLowerCase();
-  if (n.includes("ipad")) return "ipad";
-  if (n.includes("magic") || n.includes("keyboard") || n.includes("key")) return "keyboard";
-  if (n.includes("aw") || n.includes("apple watch")) return "apple_watch";
-  if (n.includes("pen") || n.includes("pencil")) return "pencil";
-  if (n.includes("mac") || n.includes("macbook") || n.includes("imac")) return "macbook";
-  if (n.includes("iphone")) return "iphone";
+  for (const cat of cachedCategories) {
+    if (cat.keywords.some(kw => n.includes(kw))) {
+      return cat.name;
+    }
+  }
   return "else";
 }
 
@@ -807,6 +821,65 @@ app.get("/api/me", requireAuth, (req, res) => {
   res.json({ user: req.user, role: req.role });
 });
 
+
+// ====== Category Management ======
+app.get("/api/categories", requireAuth, requireAdmin, async (req, res) => {
+  const { rows } = await db.execute("SELECT * FROM category_rules ORDER BY id ASC");
+  res.json({ rows });
+});
+
+app.post("/api/categories", requireAuth, requireAdmin, async (req, res) => {
+  const { id, name, keywords } = req.body;
+  if (!name || !keywords) return res.status(400).json({ error: "Missing name or keywords" });
+
+  try {
+    if (id) {
+      await db.execute({
+        sql: "UPDATE category_rules SET name = ?, keywords = ? WHERE id = ?",
+        args: [name, keywords, id]
+      });
+    } else {
+      await db.execute({
+        sql: "INSERT INTO category_rules (name, keywords) VALUES (?, ?)",
+        args: [name, keywords]
+      });
+    }
+    await loadCategories(); // Reload cache
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/api/categories/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await db.execute({ sql: "DELETE FROM category_rules WHERE id = ?", args: [req.params.id] });
+    await loadCategories(); // Reload cache
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows: items } = await db.execute("SELECT id, name FROM items WHERE is_deleted = 0");
+    const tx = await db.transaction("write");
+    
+    for (const item of items) {
+      const cat = detectCategory(item.name);
+      await tx.execute({
+        sql: "UPDATE items SET category = ? WHERE id = ?",
+        args: [cat, item.id]
+      });
+    }
+    
+    await tx.commit();
+    res.json({ ok: true, count: items.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ====== Start server ======
 app.listen(3000, "0.0.0.0", () => {
