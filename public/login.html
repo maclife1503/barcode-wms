@@ -7,26 +7,82 @@
   <title>Login</title>
 </head>
 <body>
-  <h2>Pls login</h2>
+  <h2>Barcode WMS - Login</h2>
   <div class="card">
-    <div class="row">
-      <input id="u" placeholder="username" value=""/>
-      <input id="p" placeholder="password" type="password" value=""/>
-      <button onclick="login()">Login</button>
-    </div>
-    <div id="msg"></div>
+    <form id="loginForm" onsubmit="event.preventDefault(); login();">
+      <div class="row" style="flex-direction:column; gap:12px; align-items:stretch">
+        <label for="u" style="font-size:12px; opacity:0.7">Username</label>
+        <input name="username" id="u" placeholder="username" autocomplete="username" value="" required/>
+        
+        <label for="p" style="font-size:12px; opacity:0.7">Password</label>
+        <input name="password" id="p" placeholder="password" type="password" autocomplete="current-password" value="" required/>
+        
+        <button type="submit" id="loginBtn" style="margin-top:10px; padding:12px">Login 🔑</button>
+      </div>
+    </form>
+    <div id="msg" style="margin-top:15px; color:#A40000; font-weight:bold; text-align:center"></div>
   </div>
 
 <script>
+let autoLoginTimer = null;
+
+// Lắng nghe sự kiện điền dữ liệu
+const uInput = document.getElementById("u");
+const pInput = document.getElementById("p");
+
+[uInput, pInput].forEach(el => {
+  el.addEventListener("input", checkAutoLogin);
+  el.addEventListener("change", checkAutoLogin); // Safari đôi khi dùng change cho auto-fill
+});
+
+function checkAutoLogin() {
+  if (autoLoginTimer) clearTimeout(autoLoginTimer);
+  
+  // Nếu cả 2 ô đều đã được điền (thường do trình duyệt auto-fill)
+  if (uInput.value.length > 0 && pInput.value.length > 0) {
+    autoLoginTimer = setTimeout(() => {
+      // Kiểm tra lại lần nữa trước khi tự động bấm nút
+      if (uInput.value.length > 0 && pInput.value.length > 0) {
+        console.log("Auto-login triggered...");
+        login();
+      }
+    }, 600); // Chờ 600ms để đảm bảo auto-fill hoàn tất
+  }
+}
+
 async function login(){
-  const r = await fetch("/api/login", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ username: u.value, password: p.value })
-  });
-  const j = await r.json();
-  if(!r.ok){ msg.textContent = j.error || "Login failed"; return; }
-  location.href = "/create.html";
+  if (autoLoginTimer) clearTimeout(autoLoginTimer);
+  
+  const msg = document.getElementById("msg");
+  const btn = document.getElementById("loginBtn");
+  
+  msg.textContent = "Authenticating...";
+  btn.disabled = true;
+  
+  try {
+    const r = await fetch("/api/login", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ 
+        username: uInput.value, 
+        password: pInput.value 
+      })
+    });
+    const j = await r.json().catch(() => ({}));
+    
+    if(!r.ok){ 
+      msg.textContent = j.error || "Login failed"; 
+      btn.disabled = false;
+      return; 
+    }
+    
+    msg.textContent = "Success! Redirecting...";
+    msg.style.color = "green";
+    location.href = "/create.html";
+  } catch (e) {
+    msg.textContent = "Network error";
+    btn.disabled = false;
+  }
 }
 </script>
 </body>
