@@ -85,7 +85,7 @@ async function load(){
     <div class="card table-wrap">
       <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%">
         <tr>
-          <th>Package</th><th>Name</th><th>Serial</th><th>Status</th><th>Inventory</th><th>Stock Day</th><th>Updated time</th>
+          <th>Package</th><th>Name</th><th>Serial</th><th>Loại</th><th>Status</th><th>Inventory</th><th>Stock Day</th><th>Updated time</th>
         </tr>
         ${j.rows.map(r=>{
           const diff = Math.ceil((new Date() - new Date(r.created_at)) / (1000 * 60 * 60 * 24));
@@ -95,6 +95,7 @@ async function load(){
             <td><a href="/item.html?id=${r.id}" style="${isStale ? 'color:#b00; font-weight:bold' : ''}">${esc(r.package_id)}</a></td>
             <td>${esc(r.name)}</td>
             <td>${esc(r.serial_clean || "")}</td>
+            <td><span class="pill">${esc(r.category || "else")}</span></td>
             <td>${esc(r.status)}</td>
             <td>${esc(r.inventory_status)}</td>
             <td>

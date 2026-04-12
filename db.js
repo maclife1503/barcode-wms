@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS items (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   created_by TEXT,
+  category TEXT,
   is_deleted INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT,
   deleted_by TEXT
@@ -84,10 +85,30 @@ CREATE TABLE IF NOT EXISTS inventory_exports (
 );
   `);
 
-  // Migration: Thêm cột created_by vào bảng items nếu chưa có
+  // Migration: Thêm cột created_by và category vào bảng items nếu chưa có
   try {
     await db.execute("ALTER TABLE items ADD COLUMN created_by TEXT");
   } catch(e) { /* ignore */ }
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN category TEXT");
+  } catch(e) { /* ignore */ }
+
+  // Migration: Phân loại hàng loạt cho các máy cũ chưa có category
+  try {
+    await db.execute(`
+      UPDATE items SET category = CASE 
+        WHEN lower(name) LIKE '%ipad%' THEN 'ipad'
+        WHEN lower(name) LIKE '%magic%' OR lower(name) LIKE '%keyboard%' OR lower(name) LIKE '%key%' THEN 'keyboard'
+        WHEN lower(name) LIKE '%aw%' OR lower(name) LIKE '%apple watch%' THEN 'apple_watch'
+        WHEN lower(name) LIKE '%pen%' OR lower(name) LIKE '%pencil%' THEN 'pencil'
+        WHEN lower(name) LIKE '%mac%' OR lower(name) LIKE '%macbook%' OR lower(name) LIKE '%imac%' THEN 'macbook'
+        WHEN lower(name) LIKE '%iphone%' THEN 'iphone'
+        ELSE 'else'
+      END 
+      WHERE (category IS NULL OR category = '') 
+        AND is_deleted = 0
+    `);
+  } catch(e) { console.error("Batch classification failed:", e); }
 
   await db.executeMultiple(`
 CREATE TABLE IF NOT EXISTS edit_logs (

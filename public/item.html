@@ -345,6 +345,10 @@ async function loadItem(){
           <td>${esc(it.inventory_status || "-")}</td>
         </tr>
         <tr>
+          <th style="background:#fafafa; text-align:left">Loại hàng</th>
+          <td><span class="pill">${esc(it.category || "else")}</span></td>
+        </tr>
+        <tr>
           <th style="background:#fafafa; text-align:left">Serial</th>
           <td>${esc(it.serial_clean || it.serial_raw || "-")}</td>
         </tr>

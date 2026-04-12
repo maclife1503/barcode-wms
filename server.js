@@ -139,6 +139,18 @@ function csvCell(v) {
   if (/[,"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
+
+function detectCategory(name) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("ipad")) return "ipad";
+  if (n.includes("magic") || n.includes("keyboard") || n.includes("key")) return "keyboard";
+  if (n.includes("aw") || n.includes("apple watch")) return "apple_watch";
+  if (n.includes("pen") || n.includes("pencil")) return "pencil";
+  if (n.includes("mac") || n.includes("macbook") || n.includes("imac")) return "macbook";
+  if (n.includes("iphone")) return "iphone";
+  return "else";
+}
+
 function nowISO() {
   const d = new Date();
   const jst = d.toLocaleString("sv-SE", { timeZone: "Asia/Tokyo" }).replace(" ", "T");
@@ -318,13 +330,13 @@ app.post("/api/items", requireAuth, async (req, res) => {
           name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
           status, inventory_status,
           created_at, updated_at,
-          is_deleted, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?)
+          is_deleted, created_by, category
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?, ?)
       `,
         args: [
           package_id, token,
           fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
-          t, t, req.user
+          t, t, req.user, detectCategory(fields.name)
         ]
       });
     } catch (e) {
@@ -370,7 +382,7 @@ app.get("/api/items", requireAuth, async (req, res) => {
   }
 
   const sql = `
-    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at, updated_at
+    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at, updated_at, category
     FROM items
     WHERE ${where.join(" AND ")}
     ORDER BY datetime(updated_at) DESC
