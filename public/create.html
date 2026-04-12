@@ -209,6 +209,30 @@
       raw.focus();
     }
 
+    async function pasteJson() {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        err.textContent = "Trình duyệt không hỗ trợ dán tự động (Yêu cầu HTTPS).";
+        return;
+      }
+      try {
+        raw.focus();
+        const text = await navigator.clipboard.readText();
+        if (!text) {
+          err.textContent = "Bộ nhớ tạm trống hoặc không có văn bản.";
+          return;
+        }
+        raw.value = text;
+        err.textContent = "";
+      } catch (e) {
+        console.error("Paste error:", e);
+        if (e.name === "NotAllowedError") {
+          err.textContent = "Bạn đã từ chối quyền dán. Hãy thử bấm lại và chọn 'Allow'.";
+        } else {
+          err.textContent = "Lỗi khi dán: " + (e.message || "Vui lòng thử lại");
+        }
+      }
+    }
+
     photoBox.innerHTML = ""
     async function createItem() {
       err.textContent = "";
