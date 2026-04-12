@@ -1,21 +1,23 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
   <title>Create</title>
 </head>
+
 <body>
   <div class="no-print topbar">
-  <div class="nav">
-    <a href="/create.html">Create</a>
-    <a href="/list.html">List</a>
-    <a href="/scan.html">Scan</a>
-    <a href="/inventory.html">Inventory</a>
+    <div class="nav">
+      <a href="/create.html">Create</a>
+      <a href="/list.html">List</a>
+      <a href="/scan.html">Scan</a>
+      <a href="/inventory.html">Inventory</a>
+    </div>
+    <button class="logout-btn" onclick="logout()">Logout | Login</button>
   </div>
-  <button class="logout-btn" onclick="logout()">Logout | Login</button>
-</div>
 
 
   <h2>Tạo mã / In tem</h2>
@@ -25,238 +27,229 @@
     <textarea id="raw" placeholder='{"serial":"...","mvd":"...","name":"..."}'></textarea>
 
     <div class="scan-actions" style="margin-top:12px">
-        <button id="createBtn" onclick="createItem()">Tạo</button>
-        <button id="pasteBtn" type="button" onclick="pasteJson()" style="background:#e8f0fe; border-color:#1a73e8; color:#1a73e8">Paste 📋</button>
-        <button id="clearBtn" type="button" onclick="clearJson()">Clear</button>
-        <div id="err" style="margin-top:10px;color:#A40000"></div>
+      <button id="createBtn" onclick="createItem()">Tạo</button>
+      <button id="pasteBtn" type="button" onclick="pasteJson()"
+        style="background:#e8f0fe; border-color:#1a73e8; color:#1a73e8">Paste 📋</button>
+      <button id="clearBtn" type="button" onclick="clearJson()">Clear</button>
+      <div id="err" style="margin-top:10px;color:#A40000"></div>
     </div>
 
-    </div>
+  </div>
 
-    <div id="out"></div>
-    <div id="photoBox"></div>
-
-
-
-<script>
-const photoBox = document.getElementById("photoBox");
-const LABEL_W = 548; // px (30mm @ 300dpi)
-const LABEL_H = 338; // px (50mm @ 300dpi)
-
-let lastLabel = null; // lưu data mới nhất để tải
+  <div id="out"></div>
+  <div id="photoBox"></div>
 
 
-// wrap text theo maxWidth
-function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines){
-  const words = (text || "").split(/\s+/).filter(Boolean);
-  let line = "";
-  let lines = 0;
 
-  for (let i = 0; i < words.length; i++) {
-    const test = line ? (line + " " + words[i]) : words[i];
-    const w = ctx.measureText(test).width;
-    if (w <= maxWidth) {
-      line = test;
-    } else {
-      ctx.fillText(line, x, y);
-      y += lineHeight;
-      lines++;
-      if (maxLines && lines >= maxLines) return y;
-      line = words[i];
+  <script>
+    const photoBox = document.getElementById("photoBox");
+    const LABEL_W = 548; // px (30mm @ 300dpi)
+    const LABEL_H = 338; // px (50mm @ 300dpi)
+
+    let lastLabel = null; // lưu data mới nhất để tải
+
+
+    // wrap text theo maxWidth
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      const words = (text || "").split(/\s+/).filter(Boolean);
+      let line = "";
+      let lines = 0;
+
+      for (let i = 0; i < words.length; i++) {
+        const test = line ? (line + " " + words[i]) : words[i];
+        const w = ctx.measureText(test).width;
+        if (w <= maxWidth) {
+          line = test;
+        } else {
+          ctx.fillText(line, x, y);
+          y += lineHeight;
+          lines++;
+          if (maxLines && lines >= maxLines) return y;
+          line = words[i];
+        }
+      }
+      if (line) {
+        ctx.fillText(line, x, y);
+        y += lineHeight;
+      }
+      return y;
     }
-  }
-  if (line) {
-    ctx.fillText(line, x, y);
-    y += lineHeight;
-  }
-  return y;
-}
 
-function loadImage(src){
-  return new Promise((resolve, reject)=>{
-    const img = new Image();
-    img.onload = ()=> resolve(img);
-    img.onerror = ()=> reject(new Error("Image load failed: " + src));
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Image load failed: " + src));
 
-    // chỉ set crossOrigin khi là URL http(s)
-    if (/^https?:\/\//i.test(src)) img.crossOrigin = "anonymous";
+        // chỉ set crossOrigin khi là URL http(s)
+        if (/^https?:\/\//i.test(src)) img.crossOrigin = "anonymous";
 
-    img.src = src;
-  });
-}
+        img.src = src;
+      });
+    }
 
-async function makeLabelPng({ mvd, serial, name, qrDataUrl, logoUrl = "/images/logo.png" }) {
-  const canvas = document.createElement("canvas");
-  canvas.width = LABEL_W;
-  canvas.height = LABEL_H;
-  const ctx = canvas.getContext("2d");
+    async function makeLabelPng({ mvd, serial, name, qrDataUrl, logoUrl = "/images/logo.png" }) {
+      const canvas = document.createElement("canvas");
+      canvas.width = LABEL_W;
+      canvas.height = LABEL_H;
+      const ctx = canvas.getContext("2d");
 
-  // nền trắng
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, LABEL_W, LABEL_H);
+      // nền trắng
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, LABEL_W, LABEL_H);
 
-  const pad = 7;
-  const gap = 5;
+      const pad = 7;
+      const gap = 5;
 
-  const qrSize = 326;
-  const qrX = LABEL_W - pad - qrSize;
-  const qrY = pad;
+      const qrSize = 326;
+      const qrX = LABEL_W - pad - qrSize;
+      const qrY = pad;
 
-  // vùng trái (text + logo)
-  const leftX = pad;
-  const leftY = pad;
-  const leftW = qrX - gap - leftX;
-  const leftH = LABEL_H - pad * 2;
+      // vùng trái (text + logo)
+      const leftX = pad;
+      const leftY = pad;
+      const leftW = qrX - gap - leftX;
+      const leftH = LABEL_H - pad * 2;
 
-  // Logo box ở góc trái dưới (bạn chỉnh tuỳ ý)
-  const logoBoxW = leftW;       // rộng bằng vùng trái
-  const logoBoxH = 150;         // chiều cao dành cho logo (tăng/giảm tuỳ logo)
-  const logoX = leftX;
-  const logoY = leftY + leftH - logoBoxH;
+      // Logo box ở góc trái dưới (bạn chỉnh tuỳ ý)
+      const logoBoxW = leftW;       // rộng bằng vùng trái
+      const logoBoxH = 150;         // chiều cao dành cho logo (tăng/giảm tuỳ logo)
+      const logoX = leftX;
+      const logoY = leftY + leftH - logoBoxH;
 
-  // Text chỉ được phép nằm phía trên logoBox
-  const textX = leftX;
-  const textY = leftY;
-  const textW = leftW;
-  const textH = leftH - logoBoxH - 4; // chừa thêm 4px cho thoáng
+      // Text chỉ được phép nằm phía trên logoBox
+      const textX = leftX;
+      const textY = leftY;
+      const textW = leftW;
+      const textH = leftH - logoBoxH - 4; // chừa thêm 4px cho thoáng
 
-  // vẽ QR
-  const qrImg = await loadImage(qrDataUrl);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+      // vẽ QR
+      const qrImg = await loadImage(qrDataUrl);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-  // ===== Text (clip để không xuống logo, không sang QR) =====
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(textX, textY, textW, textH);
-  ctx.clip();
+      // ===== Text (clip để không xuống logo, không sang QR) =====
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(textX, textY, textW, textH);
+      ctx.clip();
 
-  ctx.fillStyle = "#000";
+      ctx.fillStyle = "#000";
 
-  ctx.font = "800 34px -apple-system, BlinkMacSystemFont, Arial";
-  let y = textY + 36;
-  ctx.fillText(String(mvd || "-").trim(), textX, y);
+      ctx.font = "800 34px -apple-system, BlinkMacSystemFont, Arial";
+      let y = textY + 36;
+      ctx.fillText(String(mvd || "-").trim(), textX, y);
 
-  y += 22;
-  ctx.font = "700 18px -apple-system, BlinkMacSystemFont, Arial";
-  const sn = `${(serial || "-").trim()}`;
-  let snDraw = sn;
-  while (ctx.measureText(snDraw).width > textW && snDraw.length > 4) {
-    snDraw = snDraw.slice(0, -2) + "…";
-  }
-  ctx.fillText(snDraw, textX, y);
+      y += 22;
+      ctx.font = "700 18px -apple-system, BlinkMacSystemFont, Arial";
+      const sn = `${(serial || "-").trim()}`;
+      let snDraw = sn;
+      while (ctx.measureText(snDraw).width > textW && snDraw.length > 4) {
+        snDraw = snDraw.slice(0, -2) + "…";
+      }
+      ctx.fillText(snDraw, textX, y);
 
-  y += 26;
-  ctx.font = "700 20px -apple-system, BlinkMacSystemFont, Arial";
-  wrapText(ctx, (name || "-").trim(), textX, y, textW, 24, 10);
+      y += 26;
+      ctx.font = "700 20px -apple-system, BlinkMacSystemFont, Arial";
+      wrapText(ctx, (name || "-").trim(), textX, y, textW, 24, 10);
 
-  ctx.restore();
+      ctx.restore();
 
-  // ===== Vẽ logo trong "khoảng trống" (fit + giữ tỉ lệ) =====
-  try {
-    const logoImg = await loadImage(logoUrl);
+      // ===== Vẽ logo trong "khoảng trống" (fit + giữ tỉ lệ) =====
+      try {
+        const logoImg = await loadImage(logoUrl);
 
-    // bật smoothing lại cho logo để không bị răng cưa
-    ctx.imageSmoothingEnabled = true;
+        // bật smoothing lại cho logo để không bị răng cưa
+        ctx.imageSmoothingEnabled = true;
 
-    const maxW = logoBoxW;
-    const maxH = logoBoxH;
+        const maxW = logoBoxW;
+        const maxH = logoBoxH;
 
-    const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
-    const drawW = Math.round(logoImg.width * scale);
-    const drawH = Math.round(logoImg.height * scale);
+        const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
+        const drawW = Math.round(logoImg.width * scale);
+        const drawH = Math.round(logoImg.height * scale);
 
-    // căn giữa trong logo box
-    const dx = Math.round(logoX + (maxW - drawW) / 2);
-    const dy = Math.round(logoY + (maxH - drawH) / 2);
+        // căn giữa trong logo box
+        const dx = Math.round(logoX + (maxW - drawW) / 2);
+        const dy = Math.round(logoY + (maxH - drawH) / 2);
 
-    ctx.drawImage(logoImg, dx, dy, drawW, drawH);
-  } catch (e) {
-    // nếu logo lỗi thì vẫn in tem được (không crash)
-    console.warn(e);
-  }
+        ctx.drawImage(logoImg, dx, dy, drawW, drawH);
+      } catch (e) {
+        // nếu logo lỗi thì vẫn in tem được (không crash)
+        console.warn(e);
+      }
 
-  // viền mảnh
-  ctx.strokeStyle = "#ddd";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, LABEL_W - 2, LABEL_H - 2);
+      // viền mảnh
+      ctx.strokeStyle = "#ddd";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, LABEL_W - 2, LABEL_H - 2);
 
-  return canvas.toDataURL("image/png");
-}
+      return canvas.toDataURL("image/png");
+    }
 
-    
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  location.href="/login.html";
-}
 
-function esc(s){ return (s??"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-const raw = document.getElementById("raw");
-const out = document.getElementById("out");
-const err = document.getElementById("err");
-const createBtn = document.getElementById("createBtn");
-const clearBtn = document.getElementById("clearBtn");
+    async function logout() {
+      await fetch("/api/logout", { method: "POST" });
+      location.href = "/login.html";
+    }
 
-function clearJson(){
-  raw.value = "";
-  err.textContent = "";
-  out.innerHTML = "";
-  photoBox.innerHTML = "";
-  lastLabel = null;
-  raw.focus();
-}
+    function esc(s) { return (s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+    const raw = document.getElementById("raw");
+    const out = document.getElementById("out");
+    const err = document.getElementById("err");
+    const createBtn = document.getElementById("createBtn");
+    const clearBtn = document.getElementById("clearBtn");
 
-async function pasteJson(){
-  try {
-    const text = await navigator.clipboard.readText();
-    raw.value = text;
-    err.textContent = "";
-  } catch (e) {
-    err.textContent = "Không thể truy cập bộ nhớ tạm. Hãy cấp quyền dán cho trình duyệt.";
-  }
-}
+    function clearJson() {
+      raw.value = "";
+      err.textContent = "";
+      out.innerHTML = "";
+      photoBox.innerHTML = "";
+      lastLabel = null;
+      raw.focus();
+    }
 
-photoBox.innerHTML = ""
-async function createItem(){
-  err.textContent = "";
-  out.innerHTML = "";
+    photoBox.innerHTML = ""
+    async function createItem() {
+      err.textContent = "";
+      out.innerHTML = "";
 
-  const text = raw.value.trim();
-  if(!text){
-    err.textContent = "Hãy dán JSON trước.";
-    return;
-  }
+      const text = raw.value.trim();
+      if (!text) {
+        err.textContent = "Hãy dán JSON trước.";
+        return;
+      }
 
-  let r, j;
-  try{
-    r = await fetch("/api/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw_text: text })
-    });
-    j = await r.json().catch(()=> ({}));
-  }catch(e){
-    err.textContent = "Không gọi được server. Kiểm tra mạng / đăng nhập lại.";
-    return;
-  }
+      let r, j;
+      try {
+        r = await fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ raw_text: text })
+        });
+        j = await r.json().catch(() => ({}));
+      } catch (e) {
+        err.textContent = "Không gọi được server. Kiểm tra mạng / đăng nhập lại.";
+        return;
+      }
 
-  if(!r.ok){
-    err.textContent = j.error || "Create failed";
-    return;
-  }
+      if (!r.ok) {
+        err.textContent = j.error || "Create failed";
+        return;
+      }
 
-  const it = j.item;
-  // tạo PNG label 354x591
-  const png = await makeLabelPng({
-    mvd: it.mvd,
-    serial: it.serial_clean || it.serial_raw,
-    name: it.name,
-    qrDataUrl: j.qrDataUrl,
-    logoUrl: "/images/logo.png"
-  });
+      const it = j.item;
+      // tạo PNG label 354x591
+      const png = await makeLabelPng({
+        mvd: it.mvd,
+        serial: it.serial_clean || it.serial_raw,
+        name: it.name,
+        qrDataUrl: j.qrDataUrl,
+        logoUrl: "/images/logo.png"
+      });
 
-// hiển thị PNG để nhấn giữ lưu vào Photos
-  photoBox.innerHTML = `
+      // hiển thị PNG để nhấn giữ lưu vào Photos
+      photoBox.innerHTML = `
     <div class="card">
         <div class="photo-preview">
         <img id="labelImg" src="${png}" alt="label"/>
@@ -265,15 +258,16 @@ async function createItem(){
     </div>
     `;
 
-  lastLabel = {
-    mvd: it.mvd,
-    serial: it.serial_clean || it.serial_raw,
-    name: it.name,
-    qrDataUrl: j.qrDataUrl
-    };
+      lastLabel = {
+        mvd: it.mvd,
+        serial: it.serial_clean || it.serial_raw,
+        name: it.name,
+        qrDataUrl: j.qrDataUrl
+      };
 
-}
+    }
 
-</script>
+  </script>
 </body>
+
 </html>

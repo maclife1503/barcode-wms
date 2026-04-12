@@ -82,7 +82,10 @@ const AUTO_STATUS = {
 
 // ====== EFFECT ======
 let lastScanAt = 0;
-const OK_COOLDOWN_MS = 150;
+const OK_COOLDOWN_MS = 800;
+let lastScannedToken = null;
+let lastScannedAtToken = 0;
+const SAME_TOKEN_COOLDOWN_MS = 2500; // Khóa 2.5 giây nếu quét cùng 1 mã liên tục
 
 function beep(){
   try{
@@ -227,6 +230,13 @@ async function startScan(){
           const t = new URLSearchParams(u.search).get("token");
           if(t) token = t;
         }catch{}
+
+        // ✅ Chống trùng lặp mã cũ
+        if (token === lastScannedToken && (now - lastScannedAtToken < SAME_TOKEN_COOLDOWN_MS)) {
+          return;
+        }
+        lastScannedToken = token;
+        lastScannedAtToken = now;
 
         const r = await fetch(`/api/scan/${encodeURIComponent(token)}`);
         const j = await r.json().catch(()=> ({}));

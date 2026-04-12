@@ -579,13 +579,17 @@ app.post("/api/items/:id/status", requireAuth, async (req, res) => {
   const updated_at = nowISO();
 
   await db.execute({ sql: "UPDATE items SET status = ?, updated_at = ? WHERE id = ?", args: [to_status, updated_at, id] });
-  await db.execute({
-    sql: `
-    INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at)
-    VALUES(?, ?, ?, ?, ?)
-  `,
-    args: [id, from_status, to_status, req.user, updated_at]
-  });
+
+  // CHỈ ghi log nếu trạng thái thay đổi
+  if (from_status !== to_status) {
+    await db.execute({
+      sql: `
+      INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at)
+      VALUES(?, ?, ?, ?, ?)
+    `,
+      args: [id, from_status, to_status, req.user, updated_at]
+    });
+  }
 
   res.json({ ok: true });
 });
@@ -605,20 +609,16 @@ app.post("/api/items/:id/inventory", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Item is deleted" });
   }
 
+  const from_inv = item.inventory_status;
   const t = nowISO();
+
   await db.execute({
-    sql: `
-    UPDATE items
-    SET inventory_status = ?,
-        last_inventory_at = ?,
-        last_inventory_by = ?,
-        updated_at = ?
-    WHERE id = ?
-  `,
+    sql: "UPDATE items SET inventory_status = ?, last_inventory_at = ?, last_inventory_by = ?, updated_at = ? WHERE id = ?",
     args: [inventory_status, t, req.user, t, id]
   });
 
-  if (inventory_status === "IN_STOCK" || inventory_status === "NOT_IN_STOCK") {
+  // CHỈ ghi log nếu trạng thái kho thay đổi
+  if (from_inv !== inventory_status) {
     await db.execute({
       sql: `
       INSERT INTO inventory_logs(item_id, action, actor, created_at)
