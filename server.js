@@ -390,7 +390,17 @@ app.get("/api/items", requireAuth, async (req, res) => {
   `;
 
   const { rows } = await db.execute({ sql, args: params });
-  res.json({ rows });
+
+  // Lấy thống kê số lượng theo loại dựa trên bộ lọc hiện tại
+  const summarySql = `
+    SELECT coalesce(category, 'else') as category, COUNT(*) as count 
+    FROM items 
+    WHERE ${where.join(" AND ")}
+    GROUP BY category
+  `;
+  const { rows: summaryRows } = await db.execute({ sql: summarySql, args: params });
+
+  res.json({ rows, summary: summaryRows });
 });
 
 // ====== Scan: fetch by token ======
