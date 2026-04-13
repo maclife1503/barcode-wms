@@ -1,291 +1,228 @@
-/* ===== Base ===== */
+/* Import Google Font: Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ===== Core Variables: Indigo & Slate & Premium Feel ===== */
+:root {
+  --pad: 16px;
+  --gap: 12px;
+  --radius: 20px;
+  --radius-sm: 12px;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --primary-light: #eef2ff;
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* ===== Base Styles ===== */
 * { box-sizing: border-box; }
 
-:root{
-  --pad: 14px;
-  --gap: 12px;
-  --radius: 16px;
-  --border: #d7d7d7;
-  --bg: #ffffff;
-  --muted: #666;
+html, body { 
+  height: 100%; 
+  background: var(--bg);
+  scroll-behavior: smooth;
 }
 
-html, body { height: 100%; }
-body{
+body {
   margin: 0;
   padding: var(--pad);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  background: #fff;
-  color: #111;
+  padding-top: 80px; /* Chừa chỗ cho Fixed Topbar */
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  color: var(--text);
+  line-height: 1.5;
 }
 
-/* Prevent iOS auto zoom on form controls */
-input, select, textarea, button{
-  font-size: 16px;
-}
-
-/* ===== Links/buttons ===== */
-a{
-  color: #1a73e8;
-  text-decoration: none;
-}
-a:hover{ text-decoration: underline; }
-
-button{
-  border: 1px solid var(--border);
-  background: #f2f2f2;
-  padding: 12px 14px;
-  border-radius: 14px;
-  cursor: pointer;
-}
-button:disabled{
-  opacity: .5;
-  cursor: not-allowed;
-}
-
-/* ===== Layout helpers ===== */
-.row{
-  display: flex;
-  gap: var(--gap);
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.card{
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--pad);
-  margin: 12px 0;
-}
-
-.no-print {}
-
-/* ===== Topbar (Create / List / Scan + Logout) ===== */
-.topbar{
+/* ===== Glassmenorphism Topbar ===== */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--gap);
-  margin-bottom: 12px;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
 }
-.nav{
+
+.nav {
   display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.logout-btn{
-  padding: 10px 14px;
-  border-radius: 14px;
-  min-width: 110px;
-}
-
-/* ===== Pills ===== */
-.pills{ display:flex; gap:10px; flex-wrap:wrap; }
-.pill{
-  display:inline-block;
-  border:1px solid var(--border);
-  border-radius:999px;
-  padding:6px 10px;
-  font-size:13px;
-}
-.pill-danger{
-  border-color:#f2a3a3;
-  background:#ffecec;
-  color:#8a0000;
-}
-
-/* ===== Forms ===== */
-label{ display:block; margin: 8px 0 6px; color: var(--muted); font-size: 13px; }
-
-input[type="text"], input[type="number"], input[type="date"], select, textarea{
-  width: 100%;
-  padding: 12px 12px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  outline: none;
-  background: #fff;
-}
-textarea{
-  min-height: 160px;
-  resize: vertical;
-}
-
-/* ===== Table wrap (if you have tables) ===== */
-.table-wrap{
-  width: 100%;
-  overflow-x: auto;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto; /* Cho phép cuộn trên mobile */
   -webkit-overflow-scrolling: touch;
 }
 
-/* ===== FORCE: text dọc bên trái QR (dùng đúng class left/right) ===== */
-.label{
-  width: 50mm !important;
-  height: 30mm !important;
-  padding: 2.2mm !important;
-  background: #fff !important;
-
-  display: grid !important;
-  grid-template-columns: 1fr 26mm !important;  /* trái text, phải QR */
-  gap: 2mm !important;
-  align-items: stretch !important;
-}
-
-/* Cột trái: bắt buộc xếp DỌC */
-.label .left{
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: flex-start !important;
-  align-items: flex-start !important;
-  gap: 0.8mm !important;
-  min-width: 0 !important;
-}
-
-/* đảm bảo từng dòng là block (không bị inline) */
-.label .left .mvd,
-.label .left .serial,
-.label .left .name{
-  display: block !important;
-  width: 100% !important;
-  min-width: 0 !important;
-}
-
-.label .mvd{
-  font-size: 10.5pt !important;
-  font-weight: 800 !important;
-  line-height: 1.05 !important;
-  white-space: nowrap !important;
-}
-
-.label .serial{
-  font-size: 7.2pt !important;
-  line-height: 1.1 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-.label .name{
-  font-size: 7.6pt !important;
-  line-height: 1.15 !important;
-  white-space: normal !important;
-  word-break: break-word !important;
-  overflow: hidden !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 3 !important;
-  -webkit-box-orient: vertical !important;
-}
-
-/* Cột phải: QR to nhất */
-.label .right{
-  width: 26mm !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.label .qr{
-  width: 26mm !important;
-  height: 26mm !important;
-  object-fit: contain !important;
-  image-rendering: pixelated !important;
-}
-
-
-.photo-preview{
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  overflow: hidden;        /* ✅ không cho tràn */
-}
-
-.photo-preview img{
-  max-width: 100%;         /* ✅ luôn nằm gọn trong card */
-  height: auto;
-  display: block;
-  border-radius: 14px;     /* tuỳ, có thể bỏ */
-  background: #fff;
-}
-
-.photo-hint{
-  text-align: center;
-  color: #666;
+.nav a {
+  padding: 8px 14px;
+  border-radius: 12px;
   font-size: 14px;
-  margin-top: 8px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.2s;
+  white-space: nowrap;
 }
-/* ACTION BUTTONS: luôn nằm ngang */
-.scan-actions{
-  display:flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap;              /* nếu màn nhỏ sẽ xuống dòng */
-  gap: 10px;
+
+.nav a:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav a.active {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.logout-btn {
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--text);
+  min-width: auto;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* ===== Typography ===== */
+h2, h3, h4 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-top: 0;
+}
+
+/* ===== Cards & Containers ===== */
+.card {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad);
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* Hover effect cho dashboard cards */
+.card.interactive {
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.card.interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+}
+
+/* ===== Buttons & Inputs ===== */
+button {
+  font-family: inherit;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 12px 18px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Primary Button with Gradient */
+button:not(.logout-btn):not([onclick*="delete"]):not([onclick*="delItem"]) {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+}
+button:not(.logout-btn):hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+button:active { transform: translateY(0); }
+
+/* Inputs */
+input[type="text"], input[type="number"], select, textarea {
+  font-family: inherit;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* ===== Tables (Modern Look) ===== */
+.table-wrap {
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+th {
+  background: #f8fafc;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+}
+
+td {
+  border-bottom: 1px solid var(--border);
+}
+
+tr:last-child td { border-bottom: none; }
+
+/* Pills */
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: none;
+}
+.pill-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ===== Scan & Layout Helpers ===== */
+.row {
+  display: flex;
+  gap: var(--gap);
+  flex-wrap: wrap;
   align-items: center;
 }
 
-.scan-actions button{
-  width: auto !important;       /* chặn kiểu full-width */
-  flex: 0 0 auto;
-}
-/* Thu nhỏ vùng scan */
-.qr-reader{
-  width: 300px;
-  max-width: 200vw;
-  margin: 0 auto;
-  border-radius: 14px;
+.qr-reader {
+  border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--shadow-lg);
 }
 
-/* html5-qrcode đôi khi bọc nhiều div/canvas/video */
-#reader video, #reader canvas{
-  width: 100% !important;
-  height: auto !important;
-  border-radius: 10px;
+/* Hide print elements */
+@media print {
+  .no-print { display: none !important; }
+  body { padding-top: 0; }
 }
-
-/* Hiệu ứng quét OK */
-.scan-ok{
-  opacity: 0;
-  transform: translateY(-6px);
-  transition: all .2s ease;
-  font-weight: 700;
-  margin-top: 10px;
-  text-align: center;
-  color: #0a7a2f;
-}
-.scan-ok.show{
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Flash nền nhẹ khi quét thành công */
-body.scan-success{
-  animation: flashOk .25s ease;
-}
-
-
-
-@keyframes flashOk{
-  0% { background: #ffffff; }
-  50%{ background: #eafff0; }
-  100%{ background: #ffffff; }
-}
-/* ===== Scan mode buttons ===== */
-.scan-actions button.active{
-  background: #111;
-  color: #fff;
-  border-color: #111;
-  font-weight: 900;
-}
-
-/* nếu bạn muốn mỗi mode 1 màu riêng (tuỳ chọn) */
-#modeShip.active{ background:#0a7a2f; border-color:#0a7a2f; color:#fff; }
-#modeReturn.active{ background:#b45309; border-color:#b45309; color:#fff; }
-#modeInv.active{ background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
-
-/* hover cho đẹp */
-.scan-actions button:hover{
-  filter: brightness(0.95);
-}
-
-body.scan-error { background: #ffecec; }

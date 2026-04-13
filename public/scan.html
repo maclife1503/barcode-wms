@@ -4,452 +4,229 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Scan</title>
+  <title>Scan - WMS</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    /* Mode-specific active states for Scan Page */
+    #modeShip.active { background: #16a34a !important; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3); }
+    #modeReturn.active { background: #ea580c !important; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); }
+    #modeInv.active { background: #2563eb !important; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+    
+    .scan-actions button {
+      flex: 1;
+      min-width: 100px;
+      background: white;
+      color: var(--text);
+      border: 1.5px solid var(--border);
+      box-shadow: none;
+    }
+    
+    /* Hiệu ứng tia laser quét */
+    .scanner-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: rgba(79, 70, 229, 0.6);
+      box-shadow: 0 0 8px 2px rgba(79, 70, 229, 0.4);
+      z-index: 10;
+      animation: scanning 2s infinite ease-in-out;
+      display: none;
+    }
+    @keyframes scanning {
+      0% { top: 0%; }
+      50% { top: 100%; }
+      100% { top: 0%; }
+    }
+  </style>
 </head>
 <body>
   <div class="no-print topbar">
     <div class="nav">
       <a href="/create.html">Create</a>
       <a href="/list.html">List</a>
-      <a href="/scan.html">Scan</a>
+      <a href="/scan.html" class="active">Scan</a>
       <a href="/inventory.html">Inventory</a>
       <a href="/settings.html" id="navSettings" style="display:none">Settings</a>
     </div>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 
-  <!-- ✅ bỏ "Scan / Kiểm hàng" -->
-
-  <!-- ✅ chỉ còn 3 nút mode -->
-  <div class="card">
-    <div class="scan-actions no-print" style="flex-wrap:wrap">
+  <div class="card" style="margin-top:0">
+    <div class="scan-actions row" style="gap:10px">
       <button id="modeShip" onclick="setMode('SHIP')">Shipped</button>
       <button id="modeReturn" onclick="setMode('RETURN')">Return</button>
       <button id="modeInv" onclick="setMode('INVENTORY')">Inventory</button>
     </div>
-
-    <div style="margin-top:10px; font-size:13px; opacity:.85" id="modeHint"></div>
-    <div id="scanErr" style="margin-top:10px;color:#b00"></div>
+    <div id="modeHint" style="margin-top:12px; font-size:13px; color:var(--muted); font-weight:500"></div>
+    <div id="scanErr" style="margin-top:8px; color:#ef4444; font-weight:600; font-size:14px"></div>
   </div>
 
-  <!-- ✅ thông tin item ở TRÊN vùng quét -->
   <div id="itemBox"></div>
 
-  <!-- ✅ vùng quét -->
-  <div class="card" style="margin-top:10px">
-    <div id="readerWrap" style="display:block">
-      <div id="reader" class="qr-reader"></div>
-      <div id="hint" style="margin-top:8px;">Đưa QR vào giữa khung</div>
-    </div>
-    <div id="scanOk" class="scan-ok">Đã quét ✅</div>
+  <div class="card" style="padding:10px; position:relative">
+    <div id="scannerLine" class="scanner-overlay"></div>
+    <div id="reader" class="qr-reader"></div>
+    <div id="scanOk" class="scan-ok" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:20; background:rgba(255,255,255,0.9); padding:20px; border-radius:100px; box-shadow:var(--shadow-lg); font-size:40px; border:4px solid #16a34a">✅</div>
+    <div id="hint" style="text-align:center; margin-top:12px; color:var(--muted); font-size:14px">Đưa QR vào giữa khung hình</div>
   </div>
 
-  <!-- INVENTORY TABLE -->
-  <div id="invBox" style="display:none"></div>
+  <div id="invBox" style="display:none; margin-top:20px"></div>
 
 <script>
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  location.href="/login.html";
-}
+async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
 async function checkAdmin() {
-  const r = await fetch("/api/me");
-  const j = await r.json();
+  const r = await fetch("/api/me"); const j = await r.json();
   if (j.role === 'admin') {
     const nav = document.getElementById("navSettings");
     if (nav) nav.style.display = "inline-block";
   }
 }
 checkAdmin();
-function esc(s){
-  return (s??"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
-}
-function fmtTime(s) {
-  if (!s) return "-";
-  try {
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return s;
-    return d.toLocaleString();
-  } catch(e) { return s; }
-}
 
-const itemBox = document.getElementById("itemBox");
-const invBox  = document.getElementById("invBox");
-const scanErr = document.getElementById("scanErr");
+function esc(s){ return (s??"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-let currentItem = null;
-
-// ====== MODE ======
 let MODE = null;
-const modeHint = document.getElementById("modeHint");
-
-// auto status mapping
-const AUTO_STATUS = {
-  SHIP: "SHIPPED",
-  RETURN: "HENBIN"
-};
-
-// ====== EFFECT ======
+let html5QrCode = null;
+let isScanning = false;
 let lastScanAt = 0;
-const OK_COOLDOWN_MS = 800;
 let lastScannedToken = null;
 let lastScannedAtToken = 0;
-const SAME_TOKEN_COOLDOWN_MS = 2500; // Khóa 2.5 giây nếu quét cùng 1 mã liên tục
 
 function beep(){
-  try{
+  try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 1200;  // cao hơn -> nghe rõ hơn
-    g.gain.value = 0.08;       // âm lượng
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type = "sine"; o.frequency.value = 1400; g.gain.value = 0.05;
     o.connect(g); g.connect(ctx.destination);
-    o.start();
-    setTimeout(()=>{ o.stop(); ctx.close(); }, 90); // thời gian tít
-  }catch(e){}
+    o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 80);
+  } catch(e) {}
 }
 
 function flashSuccess(){
-  document.body.classList.add("scan-success");
-  const ok = document.getElementById("scanOk");
-  ok.classList.add("show");
-
-  // ✅ tít + rung nhẹ
   beep();
   if (navigator.vibrate) navigator.vibrate([40]);
-
-  setTimeout(()=> document.body.classList.remove("scan-success"), 220);
-  setTimeout(()=> ok.classList.remove("show"), 750);
-}
-function flashError(){
-  document.body.classList.add("scan-error");
   const ok = document.getElementById("scanOk");
-  ok.classList.remove("show");
-  if (navigator.vibrate) navigator.vibrate([120]);
-  setTimeout(()=> document.body.classList.remove("scan-error"), 350);
+  ok.classList.add("show");
+  setTimeout(()=> ok.classList.remove("show"), 600);
 }
 
-// ====== CAMERA ======
-let html5QrCode = null;
-let isScanning = false;
+function flashError(){
+  if (navigator.vibrate) navigator.vibrate([150]);
+  document.body.style.background = "#fee2e2";
+  setTimeout(()=> document.body.style.background = "var(--bg)", 300);
+}
 
 async function setMode(m){
-  // ✅ nếu bấm lại đúng mode lần 2 => ẩn camera + reset mode
   if (MODE === m){
     MODE = null;
-    scanErr.textContent = "";
-    modeHint.textContent = "";
-    clearLastResult();
-    invBox.style.display = "none";
-    await stopScan(true);
-    document.getElementById("modeShip").classList.remove("active");
-    document.getElementById("modeReturn").classList.remove("active");
-    document.getElementById("modeInv").classList.remove("active");
+    document.getElementById("scannerLine").style.display = "none";
+    await stopScan();
+    ["modeShip","modeReturn","modeInv"].forEach(id=>document.getElementById(id).classList.remove("active"));
+    document.getElementById("modeHint").textContent = "";
     return;
   }
-
   MODE = m;
+  ["modeShip","modeReturn","modeInv"].forEach(id=>document.getElementById(id).classList.toggle("active", id.includes(m.charAt(0).toUpperCase() + m.slice(1).toLowerCase())));
+  
+  const hints = {
+    SHIP: "Chế độ Xuất hàng: Tự động chuyển trạng thái SHIPPED.",
+    RETURN: "Chế độ Henbin: Tự động chuyển trạng thái HENBIN.",
+    INVENTORY: "Chế độ Kiểm hàng: Lưu danh sách kiểm kê trong ngày."
+  };
+  document.getElementById("modeHint").textContent = hints[m];
+  document.getElementById("scannerLine").style.display = "block";
+  
+  if(MODE === "INVENTORY") { renderInvTable(); document.getElementById("invBox").style.display = "block"; }
+  else document.getElementById("invBox").style.display = "none";
 
-  document.getElementById("modeShip").classList.toggle("active", MODE==="SHIP");
-  document.getElementById("modeReturn").classList.toggle("active", MODE==="RETURN");
-  document.getElementById("modeInv").classList.toggle("active", MODE==="INVENTORY");
-
-  if(MODE==="SHIP"){
-    modeHint.textContent = "Shipped: quét 1 lần → tự chuyển trạng thái SHIPPED.";
-  }else if(MODE==="RETURN"){
-    modeHint.textContent = "Return: quét 1 lần → tự chuyển trạng thái HENBIN.";
-  }else{
-    modeHint.textContent = "Inventory: quét liên tục, mỗi lần quét sẽ thêm vào bảng hôm nay.";
-  }
-
-  clearLastResult();
-
-  if(MODE==="INVENTORY"){
-    invBox.style.display = "block";
-    renderInvTable();
-  }else{
-    invBox.style.display = "none";
-  }
-
-  // ✅ cam tự bật
   await startScan();
 }
 
-function clearLastResult(){
-  currentItem = null;
-  itemBox.innerHTML = "";
-  scanErr.textContent = "";
-  document.getElementById("scanOk").classList.remove("show");
-}
-
 async function startScan(){
-  if(!MODE){
-    scanErr.textContent = "Hãy chọn chế độ trước.";
-    return;
-  }
-
-  scanErr.textContent = "";
-
   if(!html5QrCode) html5QrCode = new Html5Qrcode("reader");
   if(isScanning) return;
+  const devices = await Html5Qrcode.getCameras().catch(()=>[]);
+  if(!devices.length){ alert("Không tìm thấy camera"); return; }
+  const cam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[0];
+  isScanning = true;
+  await html5QrCode.start(cam.id, {
+    fps: 20, qrbox: (vw, vh) => { const s = Math.floor(Math.min(vw, vh) * 0.75); return { width: s, height: s }; }
+  }, onScanSuccess);
+}
 
-  let devices = [];
-  try{
-    devices = await Html5Qrcode.getCameras();
-  }catch(e){
-    scanErr.textContent = "Không mở được camera. Hãy cấp quyền Camera cho Safari/Chrome.";
-    return;
-  }
+async function onScanSuccess(decodedText) {
+  const now = Date.now();
+  if(now - lastScanAt < 1000) return;
+  
+  let token = decodedText;
+  try { const u = new URL(decodedText); const t = new URLSearchParams(u.search).get("token"); if(t) token = t; } catch{}
+  
+  if (token === lastScannedToken && (now - lastScannedAtToken < 2500)) return;
+  lastScannedToken = token; lastScannedAtToken = now;
+  lastScanAt = now;
 
-  if(!devices?.length){
-    scanErr.textContent = "Không tìm thấy camera.";
-    return;
-  }
+  const r = await fetch(`/api/scan/${encodeURIComponent(token)}`);
+  const j = await r.json();
+  if(!r.ok){ flashError(); document.getElementById("scanErr").textContent = j.error || "Không tìm thấy mã"; return; }
+  
+  document.getElementById("scanErr").textContent = "";
+  const it = j.item;
+  renderItem(it);
 
-  const back = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[0];
-  const camId = back.id;
-
-  try{
-    isScanning = true;
-
-    await html5QrCode.start(
-      camId,
-      {
-        fps: 20,
-        qrbox: (vw, vh) => {
-          const s = Math.floor(Math.min(vw, vh) * 0.78);
-          return { width: s, height: s };
-        },
-        disableFlip: true,
-        videoConstraints: {
-          facingMode: { exact: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      },
-      async (decodedText) => {
-        const now = Date.now();
-        if(now - lastScanAt < OK_COOLDOWN_MS) return;
-        lastScanAt = now;
-
-        let token = decodedText;
-        try{
-          const u = new URL(decodedText);
-          const t = new URLSearchParams(u.search).get("token");
-          if(t) token = t;
-        }catch{}
-
-        // ✅ Chống trùng lặp mã cũ
-        if (token === lastScannedToken && (now - lastScannedAtToken < SAME_TOKEN_COOLDOWN_MS)) {
-          return;
-        }
-        lastScannedToken = token;
-        lastScannedAtToken = now;
-
-        const r = await fetch(`/api/scan/${encodeURIComponent(token)}`);
-        const j = await r.json().catch(()=> ({}));
-
-        if(!r.ok){
-          scanErr.textContent = j.error || "Not found";
-          flashError();
-          itemBox.innerHTML = "";
-          return;
-        }
-
-        scanErr.textContent = "";
-        currentItem = j.item;
-
-        const isDeleted = (currentItem.is_deleted === 1 || currentItem.status === "DELETED");
-
-        // ===== INVENTORY =====
-        if(MODE === "INVENTORY"){
-          const addRes = await fetch("/api/inventory/add",{
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body: JSON.stringify({ token })
-          });
-          const addJson = await addRes.json().catch(()=>({}));
-
-          if(!addRes.ok){
-            flashError();
-            scanErr.textContent = addJson.error || "Add failed";
-            renderCompactItem(true);
-            return;
-          }
-          flashSuccess();
-
-          if(!isDeleted){
-            await setInventory("IN_STOCK", { silent: true });
-          }
-
-          await renderInvTable();
-          flashSuccess();
-          renderCompactItem(false);
-          return;
-        }
-
-        // ===== SHIP / RETURN =====
-        flashSuccess();
-
-        if(!isDeleted){
-          const toStatus = AUTO_STATUS[MODE];
-          await setStatus(toStatus, { silent: true });
-          await reloadCurrentItem();
-        }
-
-        renderCompactItem(false);
-      },
-      () => {}
-    );
-
-  }catch(e){
-    isScanning = false;
-    scanErr.textContent = "Không start được camera. Hãy thử reload trang.";
+  if(MODE === "INVENTORY"){
+    const addRes = await fetch("/api/inventory/add",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({token}) });
+    if(addRes.ok) { flashSuccess(); renderInvTable(); }
+    else { flashError(); document.getElementById("scanErr").textContent = "Lỗi thêm kiểm kê"; }
+  } else {
+    const statusMap = { SHIP: "SHIPPED", RETURN: "HENBIN" };
+    await fetch(`/api/items/${it.id}/status`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({to_status: statusMap[MODE]}) });
+    flashSuccess();
   }
 }
 
-async function stopScan(hideCamera=true){
-  if(!html5QrCode || !isScanning){
-    if(hideCamera) document.getElementById("readerWrap").style.display = "none";
-    return;
-  }
-  try{
-    await html5QrCode.stop();
-    await html5QrCode.clear();
-  }catch(e){}
-  isScanning = false;
-  if(hideCamera) document.getElementById("readerWrap").style.display = "none";
+async function stopScan(){
+  if(html5QrCode && isScanning) { await html5QrCode.stop(); isScanning = false; }
 }
 
-function renderCompactItem(isError){
-  const it = currentItem;
-  if(!it){ itemBox.innerHTML = ""; return; }
-  const isDeleted = (it.is_deleted === 1 || it.status === "DELETED");
-
-  itemBox.innerHTML = `
-    <div class="card" style="border:${isError ? "2px solid #d00" : "1px solid #ddd"}">
-      <div style="font-weight:900; font-size:18px">${esc(it.name || "-")}</div>
-      <div style="margin-top:6px">Serial: <b>${esc(it.serial_clean || it.serial_raw || "-")}</b></div>
-
-      <div class="pills" style="margin-top:10px">
-        <div class="pill">Status: ${esc(it.status || "-")}</div>
-        <div class="pill">Inv: ${esc(it.inventory_status || "-")}</div>
+function renderItem(it) {
+  document.getElementById("itemBox").innerHTML = `
+    <div class="card" style="border-left:5px solid var(--primary)">
+      <div style="font-weight:800; font-size:18px">${esc(it.name)}</div>
+      <div style="font-family:monospace; margin-top:4px">SN: ${esc(it.serial_clean || "-")}</div>
+      <div class="row" style="margin-top:10px">
+        <span class="pill">${esc(it.status)}</span>
+        <span class="pill" style="background:var(--bg)">${esc(it.inventory_status)}</span>
       </div>
-
-      ${isDeleted ? `<div style="margin-top:10px;color:#A40000;font-weight:800">Item đã bị xoá (DELETED)</div>` : ""}
     </div>
   `;
-}
-
-async function reloadCurrentItem(){
-  if(!currentItem?.token) return;
-  const r = await fetch(`/api/scan/${encodeURIComponent(currentItem.token)}`);
-  const j = await r.json().catch(()=> ({}));
-  if(r.ok) currentItem = j.item;
-}
-
-async function setStatus(to_status, opts={}){
-  if(!currentItem) return;
-  const r = await fetch(`/api/items/${currentItem.id}/status`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ to_status })
-  });
-  const j = await r.json().catch(()=> ({}));
-  if(!r.ok){
-    scanErr.textContent = j.error || "Update failed";
-    return;
-  }
-}
-
-async function setInventory(inventory_status, opts={}){
-  if(!currentItem) return;
-  const r = await fetch(`/api/items/${currentItem.id}/inventory`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ inventory_status })
-  });
-  const j = await r.json().catch(()=> ({}));
-  if(!r.ok){
-    scanErr.textContent = j.error || "Update failed";
-    return;
-  }
-}
-
-async function apiGetInvRows(){
-  const r = await fetch("/api/inventory/today");
-  const j = await r.json().catch(()=>({}));
-  return j.rows || [];
-}
-
-async function apiClearInvToday(){
-  const r = await fetch("/api/inventory/today", { method:"DELETE" });
-  if(!r.ok) throw new Error("Clear failed");
-}
-
-async function apiExportInv(){
-  const r = await fetch("/api/inventory/export", { method:"POST" });
-  const j = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(j.error || "Export failed");
-  return j;
 }
 
 async function renderInvTable(){
-  const rows = await apiGetInvRows();
-  invBox.innerHTML = `
+  const r = await fetch("/api/inventory/today"); const j = await r.json();
+  const rows = j.rows || [];
+  document.getElementById("invBox").innerHTML = `
     <div class="card">
-      <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
-        <div style="font-weight:900">Inventory bảng hôm nay</div>
-        <div class="scan-actions no-print" style="flex-wrap:wrap">
-          <button onclick="downloadInvCsv()">Xuất CSV</button>
-          <button onclick="resetInventory()" style="border:1px solid #ff9800;background:#fff3e0;color:#e65100">Reset inventory</button>
-        </div>
+      <div class="row" style="justify-content:space-between; margin-bottom:12px">
+        <h3 style="margin:0">Kiểm kê hôm nay</h3>
+        <button onclick="downloadInvCsv()" style="padding:8px 12px; font-size:13px">Xuất File</button>
       </div>
-
-      <div style="margin-top:10px; overflow:auto">
-        <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%; min-width:720px">
-          <tr>
-            <th>Package</th><th>Name</th><th>Serial</th><th>MVD</th><th>Time</th><th>By</th>
-          </tr>
-          ${rows.map(r=>`
-            <tr>
-              <td>${esc(r.package_id)}</td>
-              <td>${esc(r.name)}</td>
-              <td>${esc(r.serial)}</td>
-              <td>${esc(r.mvd)}</td>
-              <td>${fmtTime(r.scanned_at)}</td>
-              <td>${esc(r.actor)}</td>
-            </tr>
-          `).join("")}
+      <div class="table-wrap">
+        <table cellpadding="10">
+          <thead><tr><th>Sản phẩm</th><th>Serial</th><th>Mã vận đơn</th></tr></thead>
+          <tbody>
+            ${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.serial)}</td><td>${esc(r.mvd)}</td></tr>`).join("")}
+          </tbody>
         </table>
-      </div>
-      <div style="margin-top:8px; font-size:12px; opacity:.8">
-        (Bảng này lưu trên server. Xuất CSV sẽ xoá bảng sau khi xuất thành công.)
       </div>
     </div>
   `;
 }
 
-async function resetInventory(){
-  if(!confirm("Đưa toàn bộ trạng thái Inventory của tất cả sản phẩm về UNKNOWN? (Lưu ý: Thao tác này KHÔNG xoá bảng bên dưới)")) return;
-  const r = await fetch("/api/inventory/reset", { method:"POST" });
-  if(!r.ok){
-    const j = await r.json().catch(()=>({}));
-    alert(j.error || "Reset failed");
-    return;
-  }
-  alert("Đã reset tất cả về UNKNOWN");
-  if(MODE === "INVENTORY") await renderInvTable();
-}
-
 async function downloadInvCsv(){
-  if(!confirm("Xuất CSV và xoá toàn bộ data kiểm kê hôm nay?")) return;
-  const j = await apiExportInv();
-  if(!j.url){ alert("Không có data để xuất"); return; }
-  window.open(j.url, "_blank");
-  await renderInvTable();
+  if(!confirm("Xuất CSV và làm sạch bảng kiểm kê hôm nay?")) return;
+  const r = await fetch("/api/inventory/export", { method:"POST" });
+  const j = await r.json();
+  if(j.url) { window.open(j.url, "_blank"); renderInvTable(); }
 }
 </script>
 </body>

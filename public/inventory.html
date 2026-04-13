@@ -4,7 +4,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Inventory Exports</title>
+  <title>Inventory Exports - WMS</title>
 </head>
 <body>
   <div class="no-print topbar">
@@ -18,16 +18,17 @@
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 
-  <h2>Inventory Exports (CSV)</h2>
-
-  <div class="scan-actions no-print" style="margin-bottom:10px; flex-wrap:wrap">
-    <button onclick="load()">Refresh</button>
-    <button onclick="testTelegram()" style="background:#e3f2fd; border-color:#2196f3; color:#1565c0">Test Telegram 🚀</button>
-    <button onclick="notifyStale()" style="background:#fff3e0; border-color:#ff9800; color:#e65100">Báo cáo tồn >15 ngày ⚠️</button>
-  </div>
-
-  <div id="status" class="card" style="padding:10px; margin-bottom:10px">
-    Status: page loaded
+  <div class="card" style="margin-top:0">
+    <h2 style="margin-bottom:12px">Báo cáo tồn kho</h2>
+    <div class="row" style="gap:10px; margin-bottom:16px">
+      <button onclick="load()" style="background:var(--primary); color:white">Làm mới</button>
+      <button onclick="testTelegram()" style="background:white; color:var(--text); border:1.5px solid var(--border)">Test Telegram 🚀</button>
+      <button onclick="notifyStale()" style="background:#fff7ed; color:#c2410c; border:1.5px solid #fed7aa">Báo cáo tồn >15 ngày ⚠️</button>
+    </div>
+    
+    <div id="status" style="font-size:13px; color:var(--muted); font-weight:500">
+      Trạng thái: Đang tải...
+    </div>
   </div>
 
   <div id="box"></div>
@@ -36,13 +37,10 @@
 function esc(s){
   return (s??"").toString().replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
 }
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  location.href="/login.html";
-}
+async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
+
 async function checkAdmin() {
-  const r = await fetch("/api/me");
-  const j = await r.json();
+  const r = await fetch("/api/me"); const j = await r.json();
   if (j.role === 'admin') {
     const nav = document.getElementById("navSettings");
     if (nav) nav.style.display = "inline-block";
@@ -50,113 +48,72 @@ async function checkAdmin() {
 }
 checkAdmin();
 
-function setStatus(msg){
-  document.getElementById("status").textContent = "Status: " + msg;
-}
+function setStatus(msg){ document.getElementById("status").textContent = "Trạng thái: " + msg; }
 
 async function testTelegram() {
-  if(!confirm("Gửi thử một tin nhắn chào mừng đến Telegram của bạn?")) return;
-  const { ok, status, json } = await apiJson("/api/telegram/test", { method: "POST" });
-  if(!ok) {
-    alert(json.error || "Gửi thất bại");
-  } else {
-    alert(json.message);
-  }
+  if(!confirm("Gửi tin nhắn thử đến Telegram?")) return;
+  const r = await fetch("/api/telegram/test", { method: "POST" });
+  const j = await r.json();
+  alert(j.message || j.error);
 }
 
 async function notifyStale() {
-  if(!confirm("Kích hoạt quét hàng tồn > 15 ngày và gửi báo cáo về Telegram?")) return;
-  const { ok, status, json } = await apiJson("/api/telegram/notify-stale-manual", { method: "POST" });
-  if(!ok) {
-    alert(json.error || "Gửi thất bại");
-  } else {
-    alert(json.message);
-  }
+  if(!confirm("Gửi báo cáo hàng tồn lâu ngày (>15d) qua Telegram?")) return;
+  const r = await fetch("/api/telegram/notify-stale-manual", { method: "POST" });
+  const j = await r.json();
+  alert(j.message || j.error);
 }
-
-async function apiJson(url, options){
-  const r = await fetch(url, options);
-  const j = await r.json().catch(()=> ({}));
-  return { ok: r.ok, status: r.status, json: j };
-}
-
-async function deleteExport(id, filename){
-  if(!confirm(`Xoá cứng file này?\n\n${filename}`)) return;
-
-  const r = await fetch(`/api/inventory/exports/${id}`, { method:"DELETE" });
-  const j = await r.json().catch(()=>({}));
-
-  if(!r.ok){
-    alert(j.error || `Delete failed (HTTP ${r.status})`);
-    return;
-  }
-
-  await load();
-}
-
-window.addEventListener("unhandledrejection", (e)=>{
-  setStatus("Promise error: " + (e?.reason?.message || e?.reason || "unknown"));
-});
-window.onerror = function(message, source, lineno, colno){
-  setStatus(`JS error: ${message} @${lineno}:${colno}`);
-};
 
 async function load(){
   const box = document.getElementById("box");
-  setStatus("Loading /api/inventory/exports ...");
-  box.innerHTML = `<div class="card">Loading...</div>`;
-
+  setStatus("Đang tải dữ liệu...");
   try{
     const r = await fetch("/api/inventory/exports", { cache: "no-store" });
-    const text = await r.text();
+    const rows = await r.json();
+    setStatus("Tải thành công");
 
-    let j;
-    try{ j = JSON.parse(text); } catch { j = null; }
-
-    const rows = Array.isArray(j) ? j : (j?.rows || []);
-    setStatus(`HTTP ${r.status} `);
-
-    if(!r.ok){
-      box.innerHTML = `<div class="card">API error: ${esc(text)}</div>`;
-      return;
-    }
-
-    if(rows.length === 0){
-      box.innerHTML = `<div class="card">Chưa có file export nào.</div>`;
+    if(!rows.length){
+      box.innerHTML = `<div class="card" style="text-align:center; color:var(--muted)">Chưa có file export nào.</div>`;
       return;
     }
 
     box.innerHTML = `
-      <div class="card">
-        <div style="font-weight:900; margin-bottom:10px">Danh sách file CSV đã xuất</div>
-        <div style="overflow:auto">
-          <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%; min-width:720px">
-            <tr>
-                <th>Date</th><th>File</th><th>By</th><th>Action</th>
-            </tr>
-            ${rows.map(x=>`
-              <tr>
-                <td>${esc(x.date_key)}</td>
-                <td><a href="${esc(x.url)}" target="_blank" download>${esc(x.filename)}</a></td>
-                <td>${esc(x.actor)}</td>
-                <td>
-                    <button onclick="deleteExport(${x.id}, '${esc(x.filename)}')" style="border:1px solid #f99;background:#fee">
-                        Delete
-                    </button>
-                </td>
-              </tr>
-            `).join("")}
+      <div class="card" style="padding:0; overflow:hidden">
+        <div style="padding:16px; font-weight:800; border-bottom:1px solid var(--border)">Lịch sử Export CSV</div>
+        <div class="table-wrap">
+          <table cellpadding="12">
+            <thead>
+              <tr><th>Ngày</th><th>Tên File</th><th>Người xuất</th><th style="width:100px">Thao tác</th></tr>
+            </thead>
+            <tbody>
+              ${rows.map(x=>`
+                <tr>
+                  <td style="font-weight:600">${esc(x.date_key)}</td>
+                  <td><a href="${esc(x.url)}" target="_blank" style="font-weight:600">${esc(x.filename)}</a></td>
+                  <td style="color:var(--muted)">${esc(x.actor)}</td>
+                  <td>
+                    <button onclick="deleteExport(${x.id}, '${esc(x.filename)}')" style="background:#fee2e2; color:#b91c1c; padding:6px 12px; font-size:12px">Xoá</button>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
           </table>
         </div>
       </div>
     `;
   }catch(e){
-    setStatus("Render failed: " + (e?.message || e));
-    box.innerHTML = `<div class="card">Render failed: ${esc(e?.message || e)}</div>`;
+    box.innerHTML = `<div class="card" style="color:#ef4444">Lỗi: ${esc(e.message)}</div>`;
   }
 }
 
-window.addEventListener("load", load);
+async function deleteExport(id, filename){
+  if(!confirm(`Xoá vĩnh viễn file: ${filename}?`)) return;
+  const r = await fetch(`/api/inventory/exports/${id}`, { method:"DELETE" });
+  if(r.ok) load();
+  else alert("Xoá thất bại");
+}
+
+load();
 </script>
 </body>
 </html>

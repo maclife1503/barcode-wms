@@ -4,7 +4,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Settings - Cài đặt</title>
+  <title>Settings - WMS</title>
 </head>
 <body>
   <div class="no-print topbar">
@@ -18,149 +18,127 @@
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 
-  <h2>Cài đặt Phân loại</h2>
-  
-  <div class="card">
-    <h3>Quản lý Loại hàng & Từ khóa</h3>
-    <p style="font-size:13px; color:#666">Hệ thống sẽ dựa vào các từ khóa này để tự động gán Loại (Category) cho sản phẩm dựa trên tên.</p>
-    
-    <div id="categoryList" style="margin-top:20px"></div>
+  <div class="card" style="margin-top:0">
+    <h2 style="margin-bottom:8px">Cấu hình hệ thống</h2>
+    <p style="color:var(--muted); font-size:14px">Quản lý các quy tắc phân loại tự động và công cụ quản trị.</p>
+  </div>
 
-    <hr/>
+  <div class="card">
+    <h3 style="margin-bottom:12px">Quản lý Loại hàng & Từ khóa</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:20px">Hệ thống sẽ dựa vào các từ khóa này để tự động gán Loại (Category) cho sản phẩm dựa trên tên. Độ ưu tiên cao hơn sẽ được kiểm tra trước.</p>
     
-    <div style="margin-top:20px">
-      <h4>Thêm loại hàng mới</h4>
-      <div class="row" style="flex-wrap:wrap">
-        <input id="newCatName" placeholder="Tên loại (vd: iphone)" style="flex:1; min-width:150px" />
-        <input id="newCatKeywords" placeholder="Từ khóa (cách nhau bằng dấu phẩy)" style="flex:2; min-width:250px" />
-        <input id="newCatPrio" type="number" placeholder="Ưu tiên (vd: 10)" style="width:100px" />
+    <div id="categoryList"></div>
+
+    <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border)">
+      <h4 style="margin-bottom:12px">Thêm loại hàng mới</h4>
+      <div class="row" style="align-items: flex-end;">
+        <div style="flex:1; min-width:150px">
+          <label>Tên loại</label>
+          <input id="newCatName" placeholder="vd: iphone" />
+        </div>
+        <div style="flex:2; min-width:250px">
+          <label>Từ khóa (cách nhau bằng dấu phẩy)</label>
+          <input id="newCatKeywords" placeholder="vd: iphone,ip15,promax" />
+        </div>
+        <div style="width:100px">
+          <label>Ưu tiên</label>
+          <input id="newCatPrio" type="number" value="0" />
+        </div>
         <button onclick="saveCategory()">Thêm mới</button>
       </div>
     </div>
   </div>
 
-  <div class="card" style="margin-top:20px; border-top: 1px solid #fee">
-    <h3>Công cụ hệ thống</h3>
-    <p style="font-size:13px; color:#666">Sau khi thay đổi từ khóa, bạn có thể chạy lại bộ phân loại để cập nhật nhãn cho toàn bộ kho hàng hiện có.</p>
-    <button onclick="reclassify()" id="reBtn" style="background:#1a73e8; color:white; padding:12px 20px">
+  <div class="card" style="border-left:5px solid var(--primary)">
+    <h3 style="margin-bottom:12px">Công cụ bảo trì</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:16px">Sau khi thay đổi từ khóa, bạn hãy chạy lại bộ phân loại để cập nhật nhãn cho TOÀN BỘ kho hàng hiện có.</p>
+    <button onclick="reclassify()" id="reBtn" style="padding:14px 24px">
       🔄 Chạy lại bộ phân loại toàn kho
     </button>
-    <div id="reMsg" style="margin-top:10px; font-weight:bold"></div>
+    <div id="reMsg" style="margin-top:12px; font-weight:600; font-size:14px"></div>
   </div>
 
 <script>
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  location.href="/login.html";
-}
+async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
 
 async function loadCategories() {
-  // Kiểm tra quyền Admin
-  const meRes = await fetch("/api/me");
-  const me = await meRes.json();
-  if (me.role !== 'admin') {
-    location.href = "/list.html";
-    return;
-  }
+  const meRes = await fetch("/api/me"); const me = await meRes.json();
+  if (me.role !== 'admin') { location.href = "/list.html"; return; }
 
-  const r = await fetch("/api/categories");
-  const j = await r.json();
-  if (!r.ok) return alert("Lỗi load categories");
+  const r = await fetch("/api/categories"); const j = await r.json();
+  if (!r.ok) return;
 
   const list = document.getElementById("categoryList");
   list.innerHTML = `
-    <table cellpadding="10" cellspacing="0" border="1" style="width:100%; border-collapse:collapse; font-size:13px">
-      <tr style="background:#fafafa">
-        <th style="width:40px">ID</th>
-        <th style="width:120px">Tên Loại</th>
-        <th>Từ khóa (Keywords)</th>
-        <th style="width:70px">Ưu tiên</th>
-        <th style="width:110px">Thao tác</th>
-      </tr>
-      ${j.rows.map(cat => `
-        <tr>
-          <td>${cat.id}</td>
-          <td><input id="name_${cat.id}" value="${cat.name}" style="width:90%" /></td>
-          <td><input id="kw_${cat.id}" value="${cat.keywords}" style="width:95%" /></td>
-          <td><input id="prio_${cat.id}" type="number" value="${cat.priority || 0}" style="width:50px" /></td>
-          <td>
-            <button onclick="saveCategory(${cat.id})" style="padding:4px 6px; background:#e8f0fe; color:#1a73e8; border:1px solid #1a73e8">Lưu</button>
-            <button onclick="deleteCategory(${cat.id})" style="padding:4px 6px; background:#fee; color:#d00; border:1px solid #d00">Xóa</button>
-          </td>
-        </tr>
-      `).join("")}
-    </table>
+    <div class="table-wrap">
+      <table cellpadding="12">
+        <thead>
+          <tr>
+            <th style="width:50px">ID</th>
+            <th style="width:140px">Tên Loại</th>
+            <th>Từ khóa</th>
+            <th style="width:90px">Ưu tiên</th>
+            <th style="width:140px">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${j.rows.map(cat => `
+            <tr>
+              <td style="color:var(--muted)">${cat.id}</td>
+              <td><input id="name_${cat.id}" value="${cat.name}" style="font-weight:700" /></td>
+              <td><input id="kw_${cat.id}" value="${cat.keywords}" /></td>
+              <td><input id="prio_${cat.id}" type="number" value="${cat.priority || 0}" style="text-align:center" /></td>
+              <td>
+                <div class="row" style="gap:8px">
+                  <button onclick="saveCategory(${cat.id})" style="background:var(--primary-light); color:var(--primary); padding:6px 12px; font-size:12px">Lưu</button>
+                  <button onclick="deleteCategory(${cat.id})" style="background:#fef2f2; color:#b91c1c; padding:6px 12px; font-size:12px">Xoá</button>
+                </div>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
 async function saveCategory(id = null) {
-  let payload = {};
-  if (id) {
-    payload = {
-      id: id,
-      name: document.getElementById(`name_${id}`).value.trim(),
-      keywords: document.getElementById(`kw_${id}`).value.trim(),
-      priority: parseInt(document.getElementById(`prio_${id}`).value) || 0
-    };
-  } else {
-    payload = {
-      name: document.getElementById("newCatName").value.trim(),
-      keywords: document.getElementById("newCatKeywords").value.trim(),
-      priority: parseInt(document.getElementById("newCatPrio").value) || 0
-    };
-  }
+  let payload = id ? {
+    id, name: document.getElementById(`name_${id}`).value.trim(),
+    keywords: document.getElementById(`kw_${id}`).value.trim(),
+    priority: parseInt(document.getElementById(`prio_${id}`).value) || 0
+  } : {
+    name: document.getElementById("newCatName").value.trim(),
+    keywords: document.getElementById("newCatKeywords").value.trim(),
+    priority: parseInt(document.getElementById("newCatPrio").value) || 0
+  };
 
-  if (!payload.name || !payload.keywords) return alert("Vui lòng nhập đủ tên và từ khóa");
-
-  const r = await fetch("/api/categories", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  
+  if (!payload.name || !payload.keywords) { alert("Thiếu thông tin"); return; }
+  const r = await fetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   if (r.ok) {
-    if(!id){
-      document.getElementById("newCatName").value = "";
-      document.getElementById("newCatKeywords").value = "";
-    }
+    if(!id){ document.getElementById("newCatName").value=""; document.getElementById("newCatKeywords").value=""; document.getElementById("newCatPrio").value="0"; }
     loadCategories();
-  } else {
-    const j = await r.json();
-    alert("Lỗi: " + j.error);
-  }
+  } else { alert("Lỗi khi lưu"); }
 }
 
 async function deleteCategory(id) {
-  if (!confirm("Bạn có chắc chắn muốn xóa loại hàng này?")) return;
+  if (!confirm("Xoá loại hàng này?")) return;
   const r = await fetch(`/api/categories/${id}`, { method: "DELETE" });
   if (r.ok) loadCategories();
 }
 
 async function reclassify() {
-  if (!confirm("Hành động này sẽ cập nhật lại Loại hàng cho TOÀN BỘ sản phẩm trong kho. Bạn có chắc chắn?")) return;
-  
-  const btn = document.getElementById("reBtn");
-  const msg = document.getElementById("reMsg");
-  btn.disabled = true;
-  msg.textContent = "Đang xử lý... Vui lòng không tắt trang.";
-  msg.style.color = "blue";
+  if (!confirm("Bắt đầu quét lại toàn bộ kho hàng?")) return;
+  const btn = document.getElementById("reBtn"); const msg = document.getElementById("reMsg");
+  btn.disabled = true; msg.textContent = "🚀 Đang xử lý... Vui lòng không đóng trang."; msg.style.color = "var(--primary)";
 
   try {
     const r = await fetch("/api/categories/reclassify", { method: "POST" });
     const j = await r.json();
-    if (r.ok) {
-      msg.textContent = `✅ Thành công! Đã cập nhật xong ${j.count} sản phẩm.`;
-      msg.style.color = "green";
-    } else {
-      msg.textContent = "❌ Lỗi: " + j.error;
-      msg.style.color = "red";
-    }
-  } catch (e) {
-    msg.textContent = "❌ Lỗi kết nối mạng.";
-    msg.style.color = "red";
-  } finally {
-    btn.disabled = false;
-  }
+    if (r.ok) { msg.textContent = `✅ Thành công! Đã cập nhật xong ${j.count} sản phẩm.`; msg.style.color = "#16a34a"; }
+    else { msg.textContent = "❌ Lỗi: " + j.error; msg.style.color = "#ef4444"; }
+  } catch (e) { msg.textContent = "❌ Lỗi kết nối."; msg.style.color = "#ef4444"; }
+  finally { btn.disabled = false; }
 }
 
 document.addEventListener("DOMContentLoaded", loadCategories);

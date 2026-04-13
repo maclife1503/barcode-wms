@@ -4,10 +4,85 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Item</title>
+  <title>Item Detail - WMS</title>
+  <style>
+    /* Premium Timeline Styles */
+    .timeline-item {
+      position: relative;
+      padding-left: 28px;
+      padding-bottom: 24px;
+      border-left: 2px solid var(--border);
+      margin-left: 12px;
+    }
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -7px;
+      top: 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 2px solid white;
+      box-shadow: 0 0 0 2px var(--primary-light);
+    }
+    .timeline-item:last-child {
+      border-left: 2px solid transparent;
+      padding-bottom: 0;
+    }
+    .timeline-time {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .timeline-content {
+      font-size: 14px;
+      color: var(--text);
+    }
+    .timeline-actor {
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .changes-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-top: 6px;
+      margin-right: 6px;
+    }
+    
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .detail-item {
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 12px;
+    }
+    .detail-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .detail-value {
+      font-size: 15px;
+      font-weight: 600;
+      word-break: break-all;
+    }
+  </style>
 </head>
 <body>
-
   <div class="no-print topbar">
     <div class="nav">
       <a href="/create.html">Create</a>
@@ -19,437 +94,159 @@
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 
-  <h2>Item detail</h2>
-  <div id="box"></div>
-
-  <div id="timelineContainer" style="display:none; margin-top:20px;">
-    <h3>Lịch sử hoạt động</h3>
-    <div id="timeline" class="card" style="padding: 20px; position:relative;"></div>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+    <h2 style="margin:0">Chi tiết sản phẩm</h2>
+    <a href="/list.html" style="font-size:14px; font-weight:600">← Quay lại</a>
   </div>
 
-  <style>
-    /* Timeline styles */
-    .timeline-item {
-      position: relative;
-      padding-left: 30px;
-      padding-bottom: 20px;
-      border-left: 2px solid #e0e0e0;
-      margin-left: 10px;
-    }
-    .timeline-item::before {
-      content: "";
-      position: absolute;
-      left: -7px;
-      top: 0;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #1a73e8;
-      border: 2px solid #fff;
-    }
-    .timeline-item:last-child {
-      border-left: none;
-      padding-bottom: 0;
-    }
-    .timeline-time {
-      font-size: 12px;
-      color: #777;
-      margin-bottom: 4px;
-    }
-    .timeline-content {
-      font-size: 14px;
-    }
-    .timeline-actor {
-      font-weight: bold;
-      color: #333;
-    }
-    .changes-tag {
-      display: inline-block;
-      font-size: 11px;
-      background: #f0f0f0;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-top: 4px;
-      margin-right: 4px;
-    }
-  </style>
+  <div id="box"></div>
+
+  <div id="timelineContainer" style="display:none; margin-top:24px;">
+    <h3 style="margin-bottom:16px">Lịch sử hoạt động</h3>
+    <div class="card" style="padding: 24px;">
+      <div id="timeline"></div>
+    </div>
+  </div>
 
 <script>
-/* ======= COPY Y HỆT từ create.html ======= */
-const LABEL_W = 548; // px (30mm @ 300dpi)
-const LABEL_H = 338; // px (50mm @ 300dpi)
-
-let lastLabel = null; // lưu data mới nhất để tải
-
-
-// wrap text theo maxWidth
+const LABEL_W = 548; const LABEL_H = 338;
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines){
   const words = (text || "").split(/\s+/).filter(Boolean);
-  let line = "";
-  let lines = 0;
-
+  let line = ""; let lines = 0;
   for (let i = 0; i < words.length; i++) {
     const test = line ? (line + " " + words[i]) : words[i];
-    const w = ctx.measureText(test).width;
-    if (w <= maxWidth) {
-      line = test;
-    } else {
-      ctx.fillText(line, x, y);
-      y += lineHeight;
-      lines++;
-      if (maxLines && lines >= maxLines) return y;
-      line = words[i];
-    }
+    if (ctx.measureText(test).width <= maxWidth) { line = test; }
+    else { ctx.fillText(line, x, y); y += lineHeight; lines++; if (maxLines && lines >= maxLines) return y; line = words[i]; }
   }
-  if (line) {
-    ctx.fillText(line, x, y);
-    y += lineHeight;
-  }
+  if (line) { ctx.fillText(line, x, y); y += lineHeight; }
   return y;
 }
-
 function loadImage(src){
   return new Promise((resolve, reject)=>{
-    const img = new Image();
-    img.onload = ()=> resolve(img);
-    img.onerror = ()=> reject(new Error("Image load failed: " + src));
-
-    // chỉ set crossOrigin khi là URL http(s)
+    const img = new Image(); img.onload = ()=> resolve(img); img.onerror = ()=> reject(new Error("Fail"));
     if (/^https?:\/\//i.test(src)) img.crossOrigin = "anonymous";
-
     img.src = src;
   });
 }
-
 async function makeLabelPng({ mvd, serial, name, qrDataUrl, logoUrl = "/images/logo.png" }) {
-  const canvas = document.createElement("canvas");
-  canvas.width = LABEL_W;
-  canvas.height = LABEL_H;
-  const ctx = canvas.getContext("2d");
-
-  // nền trắng
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, LABEL_W, LABEL_H);
-
-  const pad = 7;
-  const gap = 5;
-
-  const qrSize = 326;
-  const qrX = LABEL_W - pad - qrSize;
-  const qrY = pad;
-
-  // vùng trái (text + logo)
-  const leftX = pad;
-  const leftY = pad;
-  const leftW = qrX - gap - leftX;
-  const leftH = LABEL_H - pad * 2;
-
-  // Logo box ở góc trái dưới (bạn chỉnh tuỳ ý)
-  const logoBoxW = leftW;       // rộng bằng vùng trái
-  const logoBoxH = 150;         // chiều cao dành cho logo (tăng/giảm tuỳ logo)
-  const logoX = leftX;
-  const logoY = leftY + leftH - logoBoxH;
-
-  // Text chỉ được phép nằm phía trên logoBox
-  const textX = leftX;
-  const textY = leftY;
-  const textW = leftW;
-  const textH = leftH - logoBoxH - 4; // chừa thêm 4px cho thoáng
-
-  // vẽ QR
-  const qrImg = await loadImage(qrDataUrl);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
-
-  // ===== Text (clip để không xuống logo, không sang QR) =====
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(textX, textY, textW, textH);
-  ctx.clip();
-
-  ctx.fillStyle = "#000";
-
-  ctx.font = "800 34px -apple-system, BlinkMacSystemFont, Arial";
-  let y = textY + 36;
-  ctx.fillText(String(mvd || "-").trim(), textX, y);
-
-  y += 22;
-  ctx.font = "700 18px -apple-system, BlinkMacSystemFont, Arial";
-  const sn = `${(serial || "-").trim()}`;
-  let snDraw = sn;
-  while (ctx.measureText(snDraw).width > textW && snDraw.length > 4) {
-    snDraw = snDraw.slice(0, -2) + "…";
-  }
-  ctx.fillText(snDraw, textX, y);
-
-  y += 26;
-  ctx.font = "700 20px -apple-system, BlinkMacSystemFont, Arial";
-  wrapText(ctx, (name || "-").trim(), textX, y, textW, 24, 10);
-
+  const canvas = document.createElement("canvas"); canvas.width = LABEL_W; canvas.height = LABEL_H;
+  const ctx = canvas.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, LABEL_W, LABEL_H);
+  const pad = 7; const qrSize = 326; const qrX = LABEL_W - pad - qrSize;
+  const qrImg = await loadImage(qrDataUrl); ctx.imageSmoothingEnabled = false; ctx.drawImage(qrImg, qrX, pad, qrSize, qrSize);
+  ctx.save(); ctx.beginPath(); ctx.rect(pad, pad, qrX - 12, LABEL_H - pad*2); ctx.clip();
+  ctx.fillStyle = "#000"; ctx.font = "800 34px system-ui"; ctx.fillText(String(mvd||"-"), pad, pad + 38);
+  ctx.font = "700 18px system-ui"; let sn = (serial||"-"); while (ctx.measureText(sn).width > qrX-12 && sn.length > 4) sn = sn.slice(0, -2) + "…";
+  ctx.fillText(sn, pad, pad + 62); ctx.font = "700 20px system-ui"; wrapText(ctx, (name||"-"), pad, pad + 88, qrX-12, 24, 10);
   ctx.restore();
-
-  // ===== Vẽ logo trong "khoảng trống" (fit + giữ tỉ lệ) =====
-  try {
-    const logoImg = await loadImage(logoUrl);
-
-    // bật smoothing lại cho logo để không bị răng cưa
-    ctx.imageSmoothingEnabled = true;
-
-    const maxW = logoBoxW;
-    const maxH = logoBoxH;
-
-    const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
-    const drawW = Math.round(logoImg.width * scale);
-    const drawH = Math.round(logoImg.height * scale);
-
-    // căn giữa trong logo box
-    const dx = Math.round(logoX + (maxW - drawW) / 2);
-    const dy = Math.round(logoY + (maxH - drawH) / 2);
-
-    ctx.drawImage(logoImg, dx, dy, drawW, drawH);
-  } catch (e) {
-    // nếu logo lỗi thì vẫn in tem được (không crash)
-    console.warn(e);
-  }
-
-  // viền mảnh
-  ctx.strokeStyle = "#ddd";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, LABEL_W - 2, LABEL_H - 2);
-
+  try { const logoImg = await loadImage(logoUrl); ctx.imageSmoothingEnabled = true; const scale = Math.min((qrX-12)/logoImg.width, 140/logoImg.height);
+    const dw = logoImg.width*scale; const dh = logoImg.height*scale; ctx.drawImage(logoImg, pad + ((qrX-12)-dw)/2, LABEL_H-pad-dh, dw, dh);
+  } catch(e){}
   return canvas.toDataURL("image/png");
 }
-/* ======= END COPY ======= */
 
-function esc(s){
-  return (s ?? "").replace(/[&<>"']/g, m => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[m]));
-}
-function fmtTime(s) {
-  if (!s) return "-";
-  try {
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return s;
-    return d.toLocaleString();
-  } catch(e) { return s; }
-}
-
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  location.href="/login.html";
-}
+function esc(s){ return (s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function fmtTime(s) { if (!s) return "-"; try { return new Date(s).toLocaleString(); } catch(e) { return s; } }
+async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
 async function checkAdmin() {
-  const r = await fetch("/api/me");
-  const j = await r.json();
-  if (j.role === 'admin') {
-    const nav = document.getElementById("navSettings");
-    if (nav) nav.style.display = "inline-block";
-  }
+  const r = await fetch("/api/me"); const j = await r.json();
+  if (j.role === 'admin') { const nav = document.getElementById("navSettings"); if (nav) nav.style.display = "inline-block"; }
 }
 checkAdmin();
 
-async function apiJson(url, options){
-  const r = await fetch(url, options);
-  const j = await r.json().catch(()=> ({}));
-  return { ok: r.ok, status: r.status, json: j };
-}
-
 const params = new URLSearchParams(location.search);
 const id = params.get("id");
-const box = document.getElementById("box");
-
 let currentItem = null;
-let currentQrDataUrl = null;
 
+async function setStatus(to_status){
+  await fetch(`/api/items/${encodeURIComponent(id)}/status`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ to_status }) });
+  loadAll();
+}
+async function setInventory(inventory_status){
+  await fetch(`/api/items/${encodeURIComponent(id)}/inventory`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ inventory_status }) });
+  loadAll();
+}
 async function delItem(){
   if(!confirm("Xoá sản phẩm này?")) return;
-  const r = await fetch(`/api/items/${encodeURIComponent(id)}/delete`, { method: "POST" });
-  const j = await r.json().catch(()=> ({}));
-  if(!r.ok){ alert(j.error || "Delete failed"); return; }
+  await fetch(`/api/items/${encodeURIComponent(id)}/delete`, { method: "POST" });
   location.href = "/list.html";
 }
 
-async function renderLabel(){
-  if(!currentItem || !currentQrDataUrl) return;
+async function loadItem(){
+  if(!id) return;
+  const r = await fetch(`/api/items/${encodeURIComponent(id)}`);
+  const json = await r.json();
+  if(!r.ok) { document.getElementById("box").innerHTML = `<div class="card">${esc(json.error)}</div>`; return; }
 
-  const png = await makeLabelPng({
-    mvd: currentItem.mvd,
-    serial: currentItem.serial_clean || currentItem.serial_raw,
-    name: currentItem.name,
-    qrDataUrl: currentQrDataUrl,
-    logoUrl: "/images/logo.png"
-  });
+  const it = json.item; currentItem = it;
+  const me = await (await fetch("/api/me")).json();
+  const showDelete = me.role === "admin";
+  
+  const diffDays = Math.ceil(Math.abs(new Date() - new Date(it.created_at)) / 86400000);
+  const isStale = diffDays > 15 && (it.status==='READY_TO_SHIP'||it.status==='CREATED');
 
-  const pb = document.getElementById("photoBox");
-  pb.innerHTML = `
-    <div class="card">
-      <div class="photo-preview">
-        <img src="${png}" alt="label"/>
+  document.getElementById("box").innerHTML = `
+    <div class="card" style="margin-top:0">
+      ${isStale ? `<div style="background:#fee2e2; color:#b91c1c; padding:12px; border-radius:12px; margin-bottom:16px; font-weight:700; font-size:14px">⚠️ Hàng đã lưu kho ${diffDays} ngày (Quá hạn)</div>` : ""}
+      
+      <div class="row" style="margin-bottom:20px">
+        <button onclick="setStatus('SHIPPED')">🚚 Giao hàng</button>
+        <button onclick="setStatus('HENBIN')" style="background:#fff7ed; color:#c2410c">🔄 Hoàn trả</button>
+        <button onclick="setInventory('IN_STOCK')" style="background:#eff6ff; color:#1d4ed8">📦 Vào kho</button>
+        ${showDelete ? `<button onclick="delItem()" style="background:#fef2f2; color:#b91c1c; border:1px solid #fee2e2">Xoá cứng</button>` : ""}
       </div>
-      <div class="photo-hint">Nhấn giữ ảnh tem → “Lưu vào Ảnh”</div>
+
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-label">Mã Kiện</div><div class="detail-value" style="color:var(--primary)">${esc(it.package_id)}</div></div>
+        <div class="detail-item"><div class="detail-label">Mã Vận Đơn</div><div class="detail-value">${esc(it.mvd)}</div></div>
+        <div class="detail-item"><div class="detail-label">Trạng thái</div><div class="detail-value"><span class="pill">${esc(it.status)}</span></div></div>
+        <div class="detail-item"><div class="detail-label">Loại hàng</div><div class="detail-value"><span class="pill" style="background:var(--primary-light)">${esc(it.category)}</span></div></div>
+        <div class="detail-item"><div class="detail-label">Tồn kho</div><div class="detail-value"><span class="pill">${esc(it.inventory_status)}</span></div></div>
+        <div class="detail-item"><div class="detail-label">Lưu kho</div><div class="detail-value">${diffDays} ngày</div></div>
+      </div>
+
+      <div class="detail-item" style="margin-top:16px">
+        <div class="detail-label">Tên sản phẩm / Serial</div>
+        <div class="detail-value">${esc(it.name)}</div>
+        <div style="font-family:monospace; margin-top:4px; font-size:13px; color:var(--muted)">SN: ${esc(it.serial_clean || it.serial_raw || "-")}</div>
+      </div>
+
+      <div id="photoBox" style="margin-top:24px"></div>
+    </div>
+  `;
+  
+  const png = await makeLabelPng({ mvd:it.mvd, serial:it.serial_clean||it.serial_raw, name:it.name, qrDataUrl:json.qrDataUrl });
+  document.getElementById("photoBox").innerHTML = `
+    <div style="background:var(--bg); padding:20px; border-radius:16px; text-align:center">
+      <div class="detail-label" style="margin-bottom:12px">Bản xem trước Tem In</div>
+      <img src="${png}" style="max-width:320px; width:100%; border-radius:4px; box-shadow:var(--shadow-lg)"/>
+      <div style="font-size:12px; color:var(--muted); margin-top:8px">Mã QR chứa Token bảo mật để truy cập nhanh</div>
     </div>
   `;
 }
 
-async function loadItem(){
-  if(!id){
-    box.innerHTML = `<div class="card" style="color:#b00">Missing id</div>`;
-    return;
-  }
-
-  box.innerHTML = `<div class="card">Loading...</div>`;
-  const { ok, status, json } = await apiJson(`/api/items/${encodeURIComponent(id)}`);
-
-  if(!ok){
-    box.innerHTML = `<div class="card" style="color:#b00">${esc(json.error || `Failed (HTTP ${status})`)}</div>`;
-    return;
-  }
-
-  const it = json.item;
-  currentItem = it;
-  currentQrDataUrl = json.qrDataUrl;
-
-  const meRes = await apiJson("/api/me");
-  const role = meRes.ok ? meRes.json.role : "staff";
-  const showDelete = role === "admin";
-
-  // Calculate days in stock
-  const createdDate = new Date(it.created_at);
-  const now = new Date();
-  const diffTime = Math.abs(now - createdDate);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const staleWarning = diffDays > 15 ? `<div style="color:#d00; font-weight:800; margin-top:4px;">⚠️ Hàng đã lưu kho ${diffDays} ngày (Quá hạn 15 ngày)</div>` : "";
-
-  box.innerHTML = `
-  <div class="card">
-    ${staleWarning}
-    <!-- ACTIONS 1 HÀNG -->
-    <div class="scan-actions no-print" style="margin-bottom:12px; flex-wrap:wrap">
-      <button onclick="setStatus('SHIPPED')">Đã ship</button>
-      <button onclick="setStatus('HENBIN')">Đã henbin</button>
-      <button onclick="setInventory('IN_STOCK')">In stock</button>
-      ${showDelete ? `<button onclick="delItem()" style="border:1px solid #f99;background:#fee">Delete</button>` : ""}
-    </div>
-
-    <!-- TABLE INFO (CHỈ CẦN THIẾT) -->
-    <div class="card" style="padding:0; overflow:hidden">
-      <table cellpadding="10" cellspacing="0" border="1" style="border-collapse:collapse; width:100%; font-size:14px">
-        <tr>
-          <th style="width:140px; background:#fafafa; text-align:left">Package</th>
-          <td><b>${esc(it.package_id || "-")}</b></td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">Name</th>
-          <td>${esc(it.name || "-")}</td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">MVD</th>
-          <td><b>${esc(it.mvd || "-")}</b></td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">Status</th>
-          <td>${esc(it.status || "-")}</td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">Inventory</th>
-          <td>${esc(it.inventory_status || "-")}</td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">Loại hàng</th>
-          <td><span class="pill">${esc(it.category || "else")}</span></td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">Serial</th>
-          <td>${esc(it.serial_clean || it.serial_raw || "-")}</td>
-        </tr>
-        <tr>
-          <th style="background:#fafafa; text-align:left">Updated</th>
-          <td>${fmtTime(it.updated_at)}</td>
-        </tr>
-      </table>
-    </div>
-
-    <div id="msg" style="margin-top:10px"></div>
-
-    <hr/>
-
-    <!-- TEM Ở DƯỚI CÙNG -->
-    <div id="photoBox"></div>
-  </div>
-`;
-setTimeout(renderLabel, 0);
-
-}
-
 async function loadHistory() {
-  const { ok, json } = await apiJson(`/api/items/${encodeURIComponent(id)}/history`);
-  if (!ok) return;
-
-  const container = document.getElementById("timelineContainer");
-  const timeline = document.getElementById("timeline");
-  container.style.display = "block";
-
-  if (json.history.length === 0) {
-    timeline.innerHTML = "Chưa có lịch sử hoạt động.";
-    return;
-  }
-
-  timeline.innerHTML = json.history.map(h => {
-    let content = "";
-    let icon = "🔵";
-
-    if (h.type === "status") {
-      icon = "🚚";
-      content = `Thay đổi trạng thái: <b>${esc(h.from_status)}</b> ➔ <b>${esc(h.to_status)}</b>`;
-    } else if (h.type === "inventory") {
-      icon = "📦";
-      content = `Kiểm kho: <b>${esc(h.action)}</b>`;
-    } else if (h.type === "edit") {
-      icon = "✏️";
-      const changes = JSON.parse(h.changes_json);
-      content = `Sửa thông tin: ` + Object.keys(changes).map(k => `<span class="changes-tag">${esc(k)}</span>`).join("");
-    } else if (h.type === "created") {
-      icon = "🆕";
-      content = `<b>Đã tạo sản phẩm</b> (Mặc định: READY_TO_SHIP)`;
-    }
-
+  const r = await fetch(`/api/items/${encodeURIComponent(id)}/history`);
+  const json = await r.json(); if (!r.ok) return;
+  document.getElementById("timelineContainer").style.display = "block";
+  const tl = document.getElementById("timeline");
+  if (!json.history.length) { tl.innerHTML = "Chưa có lịch sử."; return; }
+  
+  tl.innerHTML = json.history.map(h => {
+    let icon = "⚪", content = "";
+    if (h.type === "status") { icon = "🚚"; content = `Cập nhật trạng thái: <b>${esc(h.from_status)}</b> ➔ <b>${esc(h.to_status)}</b>`; }
+    else if (h.type === "inventory") { icon = "📦"; content = `Kiểm kho: <b>${esc(h.action)}</b>`; }
+    else if (h.type === "edit") { icon = "✏️"; content = `Sửa thông tin: ` + JSON.parse(h.changes_json || "{}"); }
+    else if (h.type === "created") { icon = "🆕"; content = `Sản phẩm được tạo mới`; }
     return `
       <div class="timeline-item">
         <div class="timeline-time">${fmtTime(h.created_at)}</div>
-        <div class="timeline-content">
-          ${icon} <span class="timeline-actor">${esc(h.actor)}</span>: ${content}
-        </div>
+        <div class="timeline-content"><span class="timeline-actor">${esc(h.actor)}</span>: ${icon} ${content}</div>
       </div>
     `;
   }).join("");
 }
 
-async function loadAll(){
-  await loadItem();
-  await loadHistory();
-}
-
-async function setStatus(to_status){
-  const { ok, status, json } = await apiJson(`/api/items/${encodeURIComponent(id)}/status`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ to_status })
-  });
-  if(!ok){ alert(json.error || `Update failed (HTTP ${status})`); return; }
-  await loadAll();
-}
-
-async function setInventory(inventory_status){
-  const { ok, status, json } = await apiJson(`/api/items/${encodeURIComponent(id)}/inventory`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ inventory_status })
-  });
-  if(!ok){ alert(json.error || `Update failed (HTTP ${status})`); return; }
-  await loadAll();
-}
-
+async function loadAll(){ await loadItem(); await loadHistory(); }
 loadAll();
 </script>
 </body>

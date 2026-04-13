@@ -4,83 +4,105 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
   <link rel="stylesheet" href="styles.css" />
-  <title>Login</title>
+  <title>Login - WMS</title>
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding-top: 0;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+    .login-card {
+      max-width: 400px;
+      padding: 40px;
+      text-align: center;
+    }
+    .logo-placeholder {
+      width: 64px;
+      height: 64px;
+      background: var(--primary);
+      border-radius: 16px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 32px;
+      font-weight: 800;
+      box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
+    }
+  </style>
 </head>
 <body>
-  <h2>Barcode WMS - Login</h2>
-  <div class="card">
+  <div class="card login-card">
+    <div class="logo-placeholder">W</div>
+    <h2 style="margin-bottom:8px">Hệ thống WMS</h2>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:32px">Vui lòng đăng nhập để bắt đầu làm việc</p>
+
     <form id="loginForm" onsubmit="event.preventDefault(); login();">
-      <div class="row" style="flex-direction:column; gap:12px; align-items:stretch">
-        <label for="u" style="font-size:12px; opacity:0.7">Username</label>
-        <input name="username" id="u" placeholder="username" autocomplete="username" value="" required/>
-        
-        <label for="p" style="font-size:12px; opacity:0.7">Password</label>
-        <input name="password" id="p" placeholder="password" type="password" autocomplete="current-password" value="" required/>
-        
-        <button type="submit" id="loginBtn" style="margin-top:10px; padding:12px">Login 🔑</button>
+      <div style="text-align:left; margin-bottom:20px">
+        <label>Tên đăng nhập</label>
+        <input name="username" id="u" placeholder="Nhập username" autocomplete="username" required/>
       </div>
+      
+      <div style="text-align:left; margin-bottom:24px">
+        <label>Mật khẩu</label>
+        <input name="password" id="p" placeholder="••••••••" type="password" autocomplete="current-password" required/>
+      </div>
+      
+      <button type="submit" id="loginBtn" style="width:100%; padding:14px">Đăng nhập</button>
     </form>
-    <div id="msg" style="margin-top:15px; color:#A40000; font-weight:bold; text-align:center"></div>
+    
+    <div id="msg" style="margin-top:20px; font-weight:600; font-size:14px; min-height:20px"></div>
   </div>
 
 <script>
-let autoLoginTimer = null;
-
-// Lắng nghe sự kiện điền dữ liệu
 const uInput = document.getElementById("u");
 const pInput = document.getElementById("p");
+let autoLoginTimer = null;
 
 [uInput, pInput].forEach(el => {
   el.addEventListener("input", checkAutoLogin);
-  el.addEventListener("change", checkAutoLogin); // Safari đôi khi dùng change cho auto-fill
+  el.addEventListener("change", checkAutoLogin);
 });
 
 function checkAutoLogin() {
   if (autoLoginTimer) clearTimeout(autoLoginTimer);
-  
-  // Nếu cả 2 ô đều đã được điền (thường do trình duyệt auto-fill)
   if (uInput.value.length > 0 && pInput.value.length > 0) {
-    autoLoginTimer = setTimeout(() => {
-      // Kiểm tra lại lần nữa trước khi tự động bấm nút
-      if (uInput.value.length > 0 && pInput.value.length > 0) {
-        console.log("Auto-login triggered...");
-        login();
-      }
-    }, 600); // Chờ 600ms để đảm bảo auto-fill hoàn tất
+    autoLoginTimer = setTimeout(() => { if (uInput.value.length > 0 && pInput.value.length > 0) login(); }, 800);
   }
 }
 
 async function login(){
   if (autoLoginTimer) clearTimeout(autoLoginTimer);
-  
   const msg = document.getElementById("msg");
   const btn = document.getElementById("loginBtn");
   
-  msg.textContent = "Authenticating...";
+  msg.textContent = "⌛ Đang xác thực...";
+  msg.style.color = "var(--primary)";
   btn.disabled = true;
   
   try {
     const r = await fetch("/api/login", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ 
-        username: uInput.value, 
-        password: pInput.value 
-      })
+      body: JSON.stringify({ username: uInput.value, password: pInput.value })
     });
     const j = await r.json().catch(() => ({}));
-    
     if(!r.ok){ 
-      msg.textContent = j.error || "Login failed"; 
+      msg.textContent = "❌ " + (j.error || "Sai tài khoản hoặc mật khẩu"); 
+      msg.style.color = "#ef4444";
       btn.disabled = false;
       return; 
     }
-    
-    msg.textContent = "Success! Redirecting...";
-    msg.style.color = "green";
-    location.href = "/create.html";
+    msg.textContent = "✅ Đăng nhập thành công!";
+    msg.style.color = "#16a34a";
+    setTimeout(() => { location.href = "/create.html"; }, 500);
   } catch (e) {
-    msg.textContent = "Network error";
+    msg.textContent = "❌ Lỗi kết nối mạng";
+    msg.style.color = "#ef4444";
     btn.disabled = false;
   }
 }

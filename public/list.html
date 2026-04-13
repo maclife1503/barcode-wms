@@ -3,15 +3,14 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
-  <title>List</title>
+  <title>List - WMS</title>
 </head>
 <body>
   <div class="no-print topbar">
     <div class="nav">
       <a href="/create.html">Create</a>
-      <a href="/list.html">List</a>
+      <a href="/list.html" class="active">List</a>
       <a href="/scan.html">Scan</a>
       <a href="/inventory.html">Inventory</a>
       <a href="/settings.html" id="navSettings" style="display:none">Settings</a>
@@ -19,39 +18,51 @@
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 
-
-  <h2>Danh sách</h2>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+    <h2 style="margin:0">Danh sách kho</h2>
+    <div id="filterPath" style="font-size:14px; color:var(--primary); font-weight:600"></div>
+  </div>
 
   <div class="card no-print">
-    <div class="row">
-      <input id="q" placeholder="Tìm: package_id / serial / tracking / name" style="width:320px" />
-      <select id="status">
-        <option value="">All status</option>
-        <option>READY_TO_SHIP</option>
-        <option>SHIPPED</option>
-        <option>RETURNED</option>
-        <option>CREATED</option>
-      </select>
-      <select id="inventory">
-        <option value="">All inventory</option>
-        <option>UNKNOWN</option>
-        <option>IN_STOCK</option>
-        <option>NOT_IN_STOCK</option>
-      </select>
-
-      <!-- Không cần nút Load nữa -->
-      <!-- <button onclick="load()">Load</button> -->
+    <div class="row" style="gap:16px">
+      <div style="flex:1; min-width:280px">
+        <label>Tìm kiếm</label>
+        <input id="q" placeholder="Package ID, Serial, Name..." />
+      </div>
+      <div style="width:160px">
+        <label>Trạng thái</label>
+        <select id="status">
+          <option value="">Tất cả</option>
+          <option>READY_TO_SHIP</option>
+          <option>SHIPPED</option>
+          <option>RETURNED</option>
+          <option>CREATED</option>
+        </select>
+      </div>
+      <div style="width:160px">
+        <label>Tồn kho</label>
+        <select id="inventory">
+          <option value="">Tất cả</option>
+          <option>UNKNOWN</option>
+          <option>IN_STOCK</option>
+          <option>NOT_IN_STOCK</option>
+        </select>
+      </div>
     </div>
   </div>
 
+  <div id="dashboard"></div>
   <div id="tbl"></div>
 
 <script>
+let selectedCategory = null;
+
 function esc(s){
   return (s ?? "").replace(/[&<>"']/g, m => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[m]));
 }
+
 function fmtTime(s) {
   if (!s) return "-";
   try {
@@ -60,10 +71,12 @@ function fmtTime(s) {
     return d.toLocaleString();
   } catch(e) { return s; }
 }
+
 async function logout(){
   await fetch("/api/logout",{method:"POST"});
   location.href="/login.html";
 }
+
 async function checkAdmin() {
   const r = await fetch("/api/me");
   const j = await r.json();
@@ -73,11 +86,21 @@ async function checkAdmin() {
   }
 }
 checkAdmin();
+
+function setFilter(cat) {
+  selectedCategory = cat;
+  document.getElementById("filterPath").innerHTML = cat 
+    ? `Đang lọc: ${esc(cat)} <span onclick="setFilter(null)" style="cursor:pointer; color:#ef4444; margin-left:8px">✖ Hiện tất cả</span>`
+    : "";
+  render();
+}
+
+let cachedData = null;
+
 async function load(){
   const qEl = document.getElementById("q");
   const statusEl = document.getElementById("status");
   const inventoryEl = document.getElementById("inventory");
-  const tblEl = document.getElementById("tbl");
 
   const u = new URL("/api/items", location.origin);
   if (qEl.value) u.searchParams.set("q", qEl.value);
@@ -85,89 +108,96 @@ async function load(){
   if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
 
   const r = await fetch(u);
-  const j = await r.json();
-  if(!r.ok){
-    tblEl.innerHTML = `<div class="card" style="color:#b00">${esc(j.error || "Load failed")}</div>`;
+  cachedData = await r.json();
+  render();
+}
+
+function render() {
+  if (!cachedData) return;
+  const tblEl = document.getElementById("tbl");
+  const dashEl = document.getElementById("dashboard");
+
+  if (cachedData.error) {
+    tblEl.innerHTML = `<div class="card" style="color:#ef4444">${esc(cachedData.error)}</div>`;
     return;
   }
 
-  // Phân nhóm dữ liệu theo category
+  // Dashboard
+  let dashHtml = `<div class="row" style="margin-bottom:10px">`;
+  dashHtml += `
+    <div class="card interactive" onclick="setFilter(null)" style="flex:1; min-width:120px; text-align:center; ${!selectedCategory ? 'border-color:var(--primary); background:var(--primary-light)' : ''}">
+      <div style="font-size:12px; color:var(--muted)">Tổng cộng</div>
+      <div style="font-size:24px; font-weight:800; color:var(--primary)">${cachedData.rows.length}</div>
+    </div>
+  `;
+  (cachedData.summary || []).forEach(s => {
+    const isActive = selectedCategory === s.category;
+    dashHtml += `
+      <div class="card interactive" onclick="setFilter('${esc(s.category)}')" style="flex:1; min-width:110px; text-align:center; ${isActive ? 'border-color:var(--primary); background:var(--primary-light)' : ''}">
+        <div style="font-size:12px; color:var(--muted); text-transform:capitalize">${esc(s.category)}</div>
+        <div style="font-size:20px; font-weight:700">${s.count}</div>
+      </div>
+    `;
+  });
+  dashHtml += `</div>`;
+  dashEl.innerHTML = dashHtml;
+
+  // Grouping
   const groups = {};
-  j.rows.forEach(item => {
+  cachedData.rows.forEach(item => {
     const cat = item.category || 'else';
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(item);
   });
 
-  // Tạo Dashboard thống kê nhanh ở đầu
-  let summaryHtml = `<div class="row" style="margin-bottom:20px; flex-wrap:wrap">`;
-  summaryHtml += `
-    <div class="card" style="flex:1; min-width:120px; text-align:center; background:#f0f7ff; border-left:5px solid #1a73e8">
-      <div style="font-size:12px; color:#666">Tổng cộng</div>
-      <div style="font-size:24px; font-weight:bold">${j.rows.length}</div>
-    </div>
-  `;
-  (j.summary || []).forEach(s => {
-    summaryHtml += `
-      <div class="card" style="flex:1; min-width:100px; text-align:center; background:#fff">
-        <div style="font-size:12px; color:#666; text-transform:capitalize">${esc(s.category)}</div>
-        <div style="font-size:20px; font-weight:bold">${s.count}</div>
-      </div>
-    `;
-  });
-  summaryHtml += `</div>`;
-
-  // Vẽ các bảng theo từng nhóm
   let tablesHtml = "";
-  
-  // Sắp xếp các nhóm để 'else' xuống cuối nếu muốn, hoặc theo alphabet
-  const sortedCats = Object.keys(groups).sort((a,b) => {
-    if (a === 'else') return 1;
-    if (b === 'else') return -1;
-    return a.localeCompare(b);
-  });
+  const sortedCats = Object.keys(groups).sort((a,b) => (a === 'else' ? 1 : b === 'else' ? -1 : a.localeCompare(b)));
 
   sortedCats.forEach(cat => {
+    if (selectedCategory && cat !== selectedCategory) return;
+
     const items = groups[cat];
     tablesHtml += `
-      <h3 style="margin-top:30px; display:flex; align-items:center; gap:10px; text-transform:capitalize">
-        <span>${esc(cat)}</span>
-        <span class="pill" style="background:#666; color:#fff">${items.length} món</span>
+      <h3 style="margin: 24px 0 12px; display:flex; align-items:center; gap:10px; text-transform:capitalize">
+        ${esc(cat)} <span class="pill">${items.length}</span>
       </h3>
-      <div class="card table-wrap" style="padding:0">
-        <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%; table-layout: fixed;">
-          <tr style="background:#fafafa">
-            <th style="width:100px">Package</th>
-            <th style="width:250px">Name</th>
-            <th style="width:160px">Serial</th>
-            <th style="width:110px">Status</th>
-            <th style="width:110px">Inventory</th>
-            <th style="width:80px">Stock Day</th>
-            <th style="width:160px">Updated time</th>
-          </tr>
-          ${items.map(r=>{
-            const diff = Math.ceil((new Date() - new Date(r.created_at)) / (1000 * 60 * 60 * 24));
-            const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
-            return `
-            <tr style="${isStale ? 'background:#fff5f5; color:#b00' : ''}">
-              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap"><a href="/item.html?id=${r.id}" style="${isStale ? 'color:#b00; font-weight:bold' : ''}">${esc(r.package_id)}</a></td>
-              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">${esc(r.name)}</td>
-              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(r.serial_clean || "")}</td>
-              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(r.status)}</td>
-              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(r.inventory_status)}</td>
-              <td>
-                ${diff} d
-                ${isStale ? ' ⚠️' : ''}
-              </td>
-              <td>${fmtTime(r.updated_at)}</td>
-            </tr>
-          `}).join("")}
-        </table>
+      <div class="card" style="padding:0; overflow:hidden">
+        <div class="table-wrap">
+          <table cellpadding="12">
+            <thead>
+              <tr>
+                <th style="width:110px">Package</th>
+                <th style="width:250px">Name</th>
+                <th style="width:160px">Serial</th>
+                <th style="width:120px">Status</th>
+                <th style="width:120px">Inventory</th>
+                <th style="width:100px">Stock</th>
+                <th style="width:160px">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(r=>{
+                const diff = Math.ceil((new Date() - new Date(r.created_at)) / (86400000));
+                const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
+                return `
+                <tr style="${isStale ? 'background:#fff1f2' : ''}">
+                  <td style="font-weight:600"><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
+                  <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">${esc(r.name)}</td>
+                  <td style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
+                  <td><span class="pill" style="background:${r.status==='SHIPPED'?'#dcfce7':'#f1f5f9'}; color:${r.status==='SHIPPED'?'#166534':'var(--text)'}">${esc(r.status)}</span></td>
+                  <td><span class="pill" style="background:${r.inventory_status==='IN_STOCK'?'#dbeafe':'#f1f5f9'}">${esc(r.inventory_status)}</span></td>
+                  <td>${diff} ngày ${isStale ? '⚠️' : ''}</td>
+                  <td style="font-size:12px; color:var(--muted)">${fmtTime(r.updated_at)}</td>
+                </tr>
+              `}).join("")}
+            </tbody>
+          </table>
+        </div>
       </div>
     `;
   });
 
-  tblEl.innerHTML = summaryHtml + tablesHtml;
+  tblEl.innerHTML = tablesHtml || `<div class="card" style="text-align:center; color:var(--muted)">Không tìm thấy sản phẩm nào</div>`;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -176,23 +206,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const inventoryEl = document.getElementById("inventory");
 
   let debounceTimer = null;
-
-  // Gõ search: debounce 250ms
   qEl.addEventListener("input", () => {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(load, 250);
+    debounceTimer = setTimeout(load, 300);
   });
-
-  // Enter: load ngay
-  qEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") load();
-  });
-
-  // Đổi filter: load ngay
+  
+  qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
   statusEl.addEventListener("change", load);
   inventoryEl.addEventListener("change", load);
 
-  // Load lần đầu
   load();
 });
 </script>
