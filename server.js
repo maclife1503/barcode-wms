@@ -7,6 +7,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const QRCode = require("qrcode");
 const crypto = require("crypto");
+const FormData = require("form-data");
 const db = require("./db");
 
 const app = express();
@@ -209,6 +210,28 @@ async function sendTelegramMessage(text) {
     });
   } catch (e) {
     console.error("Telegram send failed:", e);
+  }
+}
+
+async function sendTelegramDocument(filePath, caption = "") {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId || !fs.existsSync(filePath)) return;
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendDocument`;
+    const form = new FormData();
+    form.append("chat_id", chatId);
+    form.append("caption", caption);
+    form.append("document", fs.createReadStream(filePath));
+
+    await fetch(url, {
+      method: "POST",
+      body: form,
+      headers: form.getHeaders()
+    });
+  } catch (e) {
+    console.error("Telegram document send failed:", e);
   }
 }
 
@@ -486,6 +509,11 @@ app.post("/api/items/export", requireAuth, async (req, res) => {
     });
 
     res.json({ ok: true, url, count: rows.length, filename });
+
+    // Gửi Telegram
+    sendTelegramDocument(filePath, `📊 <b>Báo cáo Danh sách (Filter)</b>\n📅 Ngày: ${date_key}\n🔢 Số lượng: ${rows.length} món\n👤 Người xuất: ${req.user}`)
+      .catch(e => console.error("Telegram export notify failed:", e));
+
   } catch (e) {
     res.status(500).json({ error: "Export failed: " + e.message });
   }
@@ -683,7 +711,12 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
     });
 
     await tx.commit();
-    res.json({ ok: true, url, count: rows.length, filename });
+    res.json({ ok: true, url, count: allRows.length, filename });
+
+    // Gửi Telegram
+    sendTelegramDocument(filePath, `📦 <b>Báo cáo Kiểm kê Kho (Audit)</b>\n📅 Ngày: ${date_key}\n🔢 Tổng cộng: ${allRows.length} món\n👤 Người xuất: ${req.user}`)
+      .catch(e => console.error("Telegram inventory export notify failed:", e));
+
   } catch (e) {
     res.status(500).json({ error: "Export failed" });
   }
