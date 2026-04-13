@@ -127,7 +127,7 @@
 
     async function checkAuth() {
       const r = await fetch("/api/me"); const j = await r.json();
-      if (j.role === 'admin') {
+      if (j.role === 'admin' && j.user === 'tho') {
         document.getElementById("navSettings").style.display = "inline-block";
       } else if (j.role === 'entry') {
         document.getElementById("navScan").style.display = "none";

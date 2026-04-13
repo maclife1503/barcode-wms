@@ -59,6 +59,10 @@ function requireAdmin(req, res, next) {
   if (req.role !== "admin") return res.status(403).json({ error: "Admin only" });
   next();
 }
+function requireSuperAdmin(req, res, next) {
+  if (req.role !== "admin" || req.user !== "tho") return res.status(403).json({ error: "Tho Admin only" });
+  next();
+}
 function requireStaff(req, res, next) {
   if (req.role !== "admin" && req.role !== "staff") return res.status(403).json({ error: "Staff/Admin only" });
   next();
@@ -657,7 +661,7 @@ app.delete("/api/inventory/exports/:id", requireAuth, requireAdmin, async (req, 
   res.json({ ok: true });
 });
 
-app.post("/api/inventory/reset", requireAuth, requireAdmin, async (req, res) => {
+app.post("/api/inventory/reset", requireAuth, requireSuperAdmin, async (req, res) => {
   try {
     await db.execute({
       sql: `UPDATE items SET inventory_status = 'UNKNOWN', last_inventory_at = NULL WHERE is_deleted = 0`,
@@ -1012,7 +1016,7 @@ app.get("/api/items/:id/history", requireAuth, async (req, res) => {
 });
 
 // ====== Telegram Bot Diagnostics ======
-app.post("/api/telegram/test", requireAuth, requireAdmin, async (req, res) => {
+app.post("/api/telegram/test", requireAuth, requireSuperAdmin, async (req, res) => {
   try {
     // 1. Thử gửi tin nhắn
     await sendTelegramMessage("🔔 <b>Hệ thống WMS:</b> Đang kiểm tra kết nối Bot...");
@@ -1094,12 +1098,12 @@ app.get("/api/me", requireAuth, (req, res) => {
 
 
 // ====== Category Management ======
-app.get("/api/categories", requireAuth, requireAdmin, async (req, res) => {
+app.get("/api/categories", requireAuth, requireSuperAdmin, async (req, res) => {
   const { rows } = await db.execute("SELECT * FROM category_rules ORDER BY id ASC");
   res.json({ rows });
 });
 
-app.post("/api/categories", requireAuth, requireAdmin, async (req, res) => {
+app.post("/api/categories", requireAuth, requireSuperAdmin, async (req, res) => {
   const { id, name, keywords, priority } = req.body;
   if (!name || !keywords) return res.status(400).json({ error: "Missing name or keywords" });
 

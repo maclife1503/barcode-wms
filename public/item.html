@@ -194,7 +194,7 @@ async function loadItem(){
   const isEntry = me.role === "entry";
   
   // Update Nav visibility
-  if (isAdmin) {
+  if (isAdmin && me.user === "tho") {
     document.getElementById("navSettings").style.display = "inline-block";
   }
   if (isEntry) {
