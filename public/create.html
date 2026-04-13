@@ -18,7 +18,7 @@
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 
-  <div class="card" style="margin-top:0">
+  <div class="card" id="qrCreationSection" style="margin-top:0">
     <h2 style="margin-bottom:8px">Tạo mã / In tem</h2>
     <p style="color:var(--muted); font-size:14px; margin-bottom:20px">Dán nội dung JSON vào ô dưới đây để tự động tạo nhãn và mã QR.</p>
     
@@ -130,10 +130,10 @@
       if (j.role === 'admin') {
         document.getElementById("navSettings").style.display = "inline-block";
       } else if (j.role === 'entry') {
-        document.getElementById("navCreate").style.display = "none";
+        // Cho phép vào trang nhưng ẩn phần tạo tem
         document.getElementById("navScan").style.display = "none";
         document.getElementById("navInventory").style.display = "none";
-        location.href = "/list.html";
+        document.getElementById("qrCreationSection").style.display = "none";
       }
     }
     checkAuth();

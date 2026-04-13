@@ -124,12 +124,10 @@ async function checkAuth() {
   if (j.role === 'admin') {
     document.getElementById("navSettings").style.display = "inline-block";
   } else if (j.role === 'entry') {
-    document.getElementById("navCreate").style.display = "none";
     document.getElementById("navScan").style.display = "none";
     document.getElementById("navInventory").style.display = "none";
     // Tự động đá ra khỏi trang nếu cố tình vào
-    if (location.pathname === "/create.html" || 
-        location.pathname === "/scan.html" || 
+    if (location.pathname === "/scan.html" || 
         location.pathname === "/inventory.html" || 
         location.pathname === "/settings.html") {
       location.href = "/list.html";
