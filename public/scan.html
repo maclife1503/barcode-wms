@@ -12,7 +12,6 @@
     #modeReturn.active { background: #ea580c !important; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); }
     #modeInv.active { background: #2563eb !important; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
     
-    /* Đảm bảo dấu tick ẩn lúc đầu */
     #scanOk { 
       opacity: 0; 
       pointer-events: none; 
@@ -22,6 +21,19 @@
     #scanOk.show { 
       opacity: 1; 
       transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Compact UI for Mobile */
+    @media (max-width: 600px) {
+      body { padding: 8px; padding-top: 54px; }
+      .topbar { padding: 4px 10px; height: 50px; }
+      .logout-btn { padding: 4px 8px; font-size: 11px; }
+      .nav a { padding: 4px 8px; font-size: 12px; }
+      .card { margin: 6px 0; padding: 10px; }
+      .scan-actions button { padding: 8px 4px; font-size: 12px; }
+      #modeHint, #scanSuccess, #scanErr { margin-top: 4px; font-size: 11px; }
+      #itemBox .card { padding: 6px 10px; border-radius: 10px; }
+      #reader { min-height: 280px; }
     }
   </style>
 </head>
@@ -211,12 +223,16 @@ async function stopScan(){
 
 function renderItem(it) {
   document.getElementById("itemBox").innerHTML = `
-    <div class="card" style="border-left:5px solid var(--primary)">
-      <div style="font-weight:800; font-size:18px">${esc(it.name)}</div>
-      <div style="font-family:monospace; margin-top:4px">SN: ${esc(it.serial_clean || "-")}</div>
-      <div class="row" style="margin-top:10px">
-        <span class="pill">${esc(it.status)}</span>
-        <span class="pill" style="background:var(--bg)">${esc(it.inventory_status)}</span>
+    <div class="card" style="border-left:4px solid var(--primary); margin-bottom:0">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px">
+        <div style="flex:1">
+          <div style="font-weight:800; font-size:15px; line-height:1.2">${esc(it.name)}</div>
+          <div style="font-family:monospace; font-size:12px; color:var(--muted); margin-top:2px">SN: ${esc(it.serial_clean || "-")}</div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px">
+          <span class="pill" style="padding:2px 8px; font-size:11px">${esc(it.status)}</span>
+          <span class="pill" style="background:var(--bg); padding:2px 8px; font-size:11px">${esc(it.inventory_status)}</span>
+        </div>
       </div>
     </div>
   `;
