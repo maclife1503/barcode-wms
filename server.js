@@ -219,7 +219,7 @@ async function sendTelegramMessage(text) {
 
 async function sendTelegramDocument(filePath, caption = "") {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = String(process.env.TELEGRAM_CHAT_ID);
   if (!token || !chatId || !fs.existsSync(filePath)) return;
 
   try {
@@ -227,8 +227,13 @@ async function sendTelegramDocument(filePath, caption = "") {
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption);
-    form.append("parse_mode", "HTML");
-    form.append("document", fs.createReadStream(filePath));
+    // Tạm thời bỏ parse_mode để test document gửi được không
+    // form.append("parse_mode", "HTML");
+    
+    // Rất quan trọng: Phải chỉ định rõ filename cho Telegram
+    form.append("document", fs.createReadStream(filePath), { 
+      filename: path.basename(filePath) 
+    });
 
     const res = await fetch(url, {
       method: "POST",
@@ -519,8 +524,8 @@ app.post("/api/items/export", requireAuth, async (req, res) => {
 
     res.json({ ok: true, url, count: rows.length, filename });
 
-    // Gửi Telegram
-    sendTelegramDocument(filePath, `📊 <b>Báo cáo Danh sách (Filter)</b>\n📅 Ngày: ${escTg(date_key)}\n🔢 Số lượng: ${rows.length} món\n👤 Người xuất: ${escTg(req.user)}`)
+    // Gửi Telegram (Plain Text)
+    sendTelegramDocument(filePath, `Báo cáo Danh sách (Filter)\nNgày: ${date_key}\nSố lượng: ${rows.length} món\nNgười xuất: ${req.user}`)
       .catch(e => console.error("Telegram export notify failed:", e));
 
   } catch (e) {
@@ -722,8 +727,8 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
     await tx.commit();
     res.json({ ok: true, url, count: allRows.length, filename });
 
-    // Gửi Telegram
-    sendTelegramDocument(filePath, `📦 <b>Báo cáo Kiểm kê Kho (Audit)</b>\n📅 Ngày: ${escTg(date_key)}\n🔢 Tổng cộng: ${allRows.length} món\n👤 Người xuất: ${escTg(req.user)}`)
+    // Gửi Telegram (Plain Text)
+    sendTelegramDocument(filePath, `Báo cáo Kiểm kê Kho (Audit)\nNgày: ${date_key}\nSố lượng: ${allRows.length} món\nNgười xuất: ${req.user}`)
       .catch(e => console.error("Telegram inventory export notify failed:", e));
 
   } catch (e) {
