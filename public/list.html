@@ -56,6 +56,9 @@
           <option>NOT_IN_STOCK</option>
         </select>
       </div>
+      <div style="align-self: flex-end; padding-bottom: 2px">
+        <button onclick="exportCsv()" style="background:var(--primary); color:white; height:42px; padding:0 16px; font-size:14px">Xuất File</button>
+      </div>
     </div>
   </div>
 
@@ -157,6 +160,30 @@ async function load(){
   const r = await fetch(u);
   cachedData = await r.json();
   render();
+}
+
+async function exportCsv() {
+  const qEl = document.getElementById("q");
+  const statusEl = document.getElementById("status");
+  const inventoryEl = document.getElementById("inventory");
+
+  const u = new URL("/api/items/export", location.origin);
+  if (qEl.value) u.searchParams.set("q", qEl.value);
+  if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+  
+  if (currentTab !== 'all') {
+    u.searchParams.set("tab", currentTab);
+  } else if (statusEl.value) {
+    u.searchParams.set("status", statusEl.value);
+  }
+
+  const res = await fetch(u, { method: "POST" });
+  const j = await res.json();
+  if (j.url) {
+    window.open(j.url, "_blank");
+  } else {
+    alert("Không có dữ liệu để xuất hoặc có lỗi xảy ra.");
+  }
 }
 
 function render() {

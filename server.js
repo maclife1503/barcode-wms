@@ -372,15 +372,15 @@ app.post("/api/items", requireAuth, async (req, res) => {
   }
 });
 
-// ====== List/search ======
-app.get("/api/items", requireAuth, async (req, res) => {
-  const { q = "", status = "", inventory = "" } = req.query;
-  const like = `%${q}%`;
+function buildItemQuery(req) {
+  const q = req.query.q;
+  const status = req.query.status;
+  const inventory = req.query.inventory;
+  const tab = req.query.tab;
 
   const where = ["is_deleted = 0"];
   const params = [];
-
-  const tab = req.query.tab;
+  const like = `%${q}%`;
 
   if (q) {
     where.push(
@@ -404,13 +404,19 @@ app.get("/api/items", requireAuth, async (req, res) => {
     where.push(`inventory_status = ?`);
     params.push(inventory);
   }
+  return { where, params };
+}
+
+// ====== List/search ======
+app.get("/api/items", requireAuth, async (req, res) => {
+  const { where, params } = buildItemQuery(req);
 
   const sql = `
     SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at, updated_at, category
     FROM items
     WHERE ${where.join(" AND ")}
     ORDER BY datetime(updated_at) DESC
-    LIMIT 500
+    LIMIT 1000
   `;
 
   const { rows } = await db.execute({ sql, args: params });
@@ -425,6 +431,64 @@ app.get("/api/items", requireAuth, async (req, res) => {
   const { rows: summaryRows } = await db.execute({ sql: summarySql, args: params });
 
   res.json({ rows, summary: summaryRows });
+});
+
+app.post("/api/items/export", requireAuth, async (req, res) => {
+  const { where, params } = buildItemQuery(req);
+  const date_key = yyyymmddLocal();
+
+  try {
+    const { rows } = await db.execute({
+      sql: `
+        SELECT category, name, serial_clean, tracking_code, package_id, mvd, status, inventory_status, created_at, updated_at
+        FROM items
+        WHERE ${where.join(" AND ")}
+        ORDER BY category ASC, name ASC
+      `,
+      args: params
+    });
+
+    if (rows.length === 0) {
+      return res.json({ ok: true, url: null, count: 0, message: "No data" });
+    }
+
+    const header = ["Category", "Name", "Serial", "Tracking", "PackageID", "MVD", "Status", "InventoryStatus", "Created", "Updated"];
+    const csv = [header.join(",")]
+      .concat(
+        rows.map((r) =>
+          [
+            csvCell(r.category),
+            csvCell(r.name),
+            csvCell(r.serial_clean),
+            csvCell(r.tracking_code),
+            csvCell(r.package_id),
+            csvCell(r.mvd),
+            csvCell(r.status),
+            csvCell(r.inventory_status),
+            csvCell(r.created_at),
+            csvCell(r.updated_at),
+          ].join(",")
+        )
+      )
+      .join("\n");
+
+    const filename = `list_export_${date_key}_${Date.now()}.csv`;
+    const filePath = path.join(EXPORT_DIR, filename);
+    fs.writeFileSync(filePath, csv, "utf8");
+    const url = `/exports/${filename}`;
+
+    await db.execute({
+      sql: `
+        INSERT INTO inventory_exports(date_key, actor, filename, url, row_count, created_at)
+        VALUES(?,?,?,?,?,?)
+      `,
+      args: [date_key, req.user, filename, url, rows.length, nowISO()]
+    });
+
+    res.json({ ok: true, url, count: rows.length, filename });
+  } catch (e) {
+    res.status(500).json({ error: "Export failed: " + e.message });
+  }
 });
 
 // ====== Scan: fetch by token ======
