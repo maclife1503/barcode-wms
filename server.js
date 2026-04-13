@@ -856,6 +856,48 @@ app.post("/api/items/:id/posted", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ====== Batch Update Posted Status by Serials ======
+app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
+  const { serials_text } = req.body;
+  if (!serials_text) return res.status(400).json({ error: "Missing serials_text" });
+
+  const serials = serials_text.split(/[\n,]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (serials.length === 0) return res.status(400).json({ error: "No valid serials found" });
+
+  try {
+    const updated_at = nowISO();
+    let totalUpdated = 0;
+
+    for (const sn of serials) {
+      // Tìm máy theo serial_clean hoặc serial_raw
+      const { rows } = await db.execute({
+        sql: "SELECT id FROM items WHERE (serial_clean = ? OR serial_raw = ?) AND is_deleted = 0",
+        args: [sn, sn]
+      });
+
+      for (const item of rows) {
+        await db.execute({
+          sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?",
+          args: [updated_at, item.id]
+        });
+        
+        await db.execute({
+          sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
+          args: [item.id, req.user, JSON.stringify({ is_posted: 1, method: "batch" }), updated_at]
+        });
+        totalUpdated++;
+      }
+    }
+
+    res.json({ ok: true, count: totalUpdated });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/items/:id", requireAuth, async (req, res) => {
   const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id=?", args: [req.params.id] });
   const it = rows[0];

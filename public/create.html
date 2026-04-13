@@ -35,6 +35,14 @@
     <div id="err" style="margin-top:10px; color:#ef4444; font-weight:600; font-size:14px"></div>
   </div>
 
+  <div class="card">
+    <h3 style="margin-bottom:12px">Cập nhật trạng thái Đã đăng bán (Batch)</h3>
+    <p style="color:var(--muted); font-size:13px; margin-bottom:12px">Nhập danh sách Serial (cách nhau bởi dấu phẩy hoặc xuống dòng) để đánh dấu đã đăng bán cho hàng loạt máy.</p>
+    <textarea id="batchSerials" placeholder="SN12345, SN67890..." style="height:80px"></textarea>
+    <button onclick="batchUpdatePosted()" id="batchBtn" style="margin-top:12px; background:#fef9c3; color:#854d0e; font-weight:700">Cập nhật đã đăng 🏷️</button>
+    <div id="batchMsg" style="margin-top:12px; font-weight:600; font-size:14px"></div>
+  </div>
+
   <div id="out"></div>
   <div id="photoBox" style="margin-top:20px"></div>
 
@@ -169,6 +177,41 @@
           </div>
         `;
       } catch (e) { err.textContent = "Lỗi kết nối Server."; }
+    }
+
+    async function batchUpdatePosted() {
+      const input = document.getElementById("batchSerials");
+      const msg = document.getElementById("batchMsg");
+      const btn = document.getElementById("batchBtn");
+      
+      const text = input.value.trim();
+      if (!text) { msg.textContent = "Hãy nhập ít nhất 1 số Serial."; msg.style.color = "#ef4444"; return; }
+      
+      btn.disabled = true;
+      msg.textContent = "⏳ Đang xử lý...";
+      msg.style.color = "var(--primary)";
+      
+      try {
+        const r = await fetch("/api/items/batch-posted", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ serials_text: text })
+        });
+        const j = await r.json();
+        if (r.ok) {
+          msg.textContent = `✅ Thành công! Đã cập nhật ${j.count} máy sang trạng thái Đã đăng.`;
+          msg.style.color = "#16a34a";
+          input.value = ""; // Clear input on success
+        } else {
+          msg.textContent = "❌ Lỗi: " + (j.error || "Thử lại sau");
+          msg.style.color = "#ef4444";
+        }
+      } catch (e) {
+        msg.textContent = "❌ Lỗi kết nối server.";
+        msg.style.color = "#ef4444";
+      } finally {
+        btn.disabled = false;
+      }
     }
   </script>
 </body>
