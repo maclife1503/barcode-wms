@@ -141,6 +141,10 @@ function csvCell(v) {
   return s;
 }
 
+function escTg(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 let cachedCategories = [];
 async function loadCategories() {
   try {
@@ -223,13 +227,18 @@ async function sendTelegramDocument(filePath, caption = "") {
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption);
+    form.append("parse_mode", "HTML");
     form.append("document", fs.createReadStream(filePath));
 
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       body: form,
       headers: form.getHeaders()
     });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Telegram document send failed status:", res.status, err);
+    }
   } catch (e) {
     console.error("Telegram document send failed:", e);
   }
@@ -511,7 +520,7 @@ app.post("/api/items/export", requireAuth, async (req, res) => {
     res.json({ ok: true, url, count: rows.length, filename });
 
     // Gửi Telegram
-    sendTelegramDocument(filePath, `📊 <b>Báo cáo Danh sách (Filter)</b>\n📅 Ngày: ${date_key}\n🔢 Số lượng: ${rows.length} món\n👤 Người xuất: ${req.user}`)
+    sendTelegramDocument(filePath, `📊 <b>Báo cáo Danh sách (Filter)</b>\n📅 Ngày: ${escTg(date_key)}\n🔢 Số lượng: ${rows.length} món\n👤 Người xuất: ${escTg(req.user)}`)
       .catch(e => console.error("Telegram export notify failed:", e));
 
   } catch (e) {
@@ -714,7 +723,7 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
     res.json({ ok: true, url, count: allRows.length, filename });
 
     // Gửi Telegram
-    sendTelegramDocument(filePath, `📦 <b>Báo cáo Kiểm kê Kho (Audit)</b>\n📅 Ngày: ${date_key}\n🔢 Tổng cộng: ${allRows.length} món\n👤 Người xuất: ${req.user}`)
+    sendTelegramDocument(filePath, `📦 <b>Báo cáo Kiểm kê Kho (Audit)</b>\n📅 Ngày: ${escTg(date_key)}\n🔢 Tổng cộng: ${allRows.length} món\n👤 Người xuất: ${escTg(req.user)}`)
       .catch(e => console.error("Telegram inventory export notify failed:", e));
 
   } catch (e) {
