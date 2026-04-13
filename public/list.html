@@ -135,20 +135,26 @@ async function load(){
         <span class="pill" style="background:#666; color:#fff">${items.length} món</span>
       </h3>
       <div class="card table-wrap" style="padding:0">
-        <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%">
+        <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse; width:100%; table-layout: fixed;">
           <tr style="background:#fafafa">
-            <th style="width:100px">Package</th><th>Name</th><th>Serial</th><th style="width:120px">Status</th><th style="width:120px">Inventory</th><th>Stock Day</th><th>Updated time</th>
+            <th style="width:100px">Package</th>
+            <th style="width:250px">Name</th>
+            <th style="width:160px">Serial</th>
+            <th style="width:110px">Status</th>
+            <th style="width:110px">Inventory</th>
+            <th style="width:80px">Stock Day</th>
+            <th style="width:160px">Updated time</th>
           </tr>
           ${items.map(r=>{
             const diff = Math.ceil((new Date() - new Date(r.created_at)) / (1000 * 60 * 60 * 24));
             const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
             return `
             <tr style="${isStale ? 'background:#fff5f5; color:#b00' : ''}">
-              <td><a href="/item.html?id=${r.id}" style="${isStale ? 'color:#b00; font-weight:bold' : ''}">${esc(r.package_id)}</a></td>
-              <td>${esc(r.name)}</td>
-              <td>${esc(r.serial_clean || "")}</td>
-              <td>${esc(r.status)}</td>
-              <td>${esc(r.inventory_status)}</td>
+              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap"><a href="/item.html?id=${r.id}" style="${isStale ? 'color:#b00; font-weight:bold' : ''}">${esc(r.package_id)}</a></td>
+              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">${esc(r.name)}</td>
+              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(r.serial_clean || "")}</td>
+              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(r.status)}</td>
+              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(r.inventory_status)}</td>
               <td>
                 ${diff} d
                 ${isStale ? ' ⚠️' : ''}
