@@ -41,18 +41,18 @@
     <h2 style="margin-bottom:8px">Hệ thống WMS</h2>
     <p style="color:var(--muted); font-size:14px; margin-bottom:32px">Vui lòng đăng nhập để bắt đầu làm việc</p>
 
-    <form id="loginForm" onsubmit="event.preventDefault(); login();">
-      <div style="text-align:left; margin-bottom:20px">
-        <label>Tên đăng nhập</label>
+    <form id="loginForm" onsubmit="event.preventDefault(); login();" style="text-align:left">
+      <div style="margin-bottom:20px">
+        <label for="u">Tên đăng nhập</label>
         <input name="username" id="u" placeholder="Nhập username" autocomplete="username" required/>
       </div>
       
-      <div style="text-align:left; margin-bottom:24px">
-        <label>Mật khẩu</label>
+      <div style="margin-bottom:28px">
+        <label for="p">Mật khẩu</label>
         <input name="password" id="p" placeholder="••••••••" type="password" autocomplete="current-password" required/>
       </div>
       
-      <button type="submit" id="loginBtn" style="width:100%; padding:14px">Đăng nhập</button>
+      <button type="submit" id="loginBtn" style="width:100%; padding:14px; font-weight:800; font-size:16px">Đăng nhập ngay</button>
     </form>
     
     <div id="msg" style="margin-top:20px; font-weight:600; font-size:14px; min-height:20px"></div>

@@ -74,20 +74,20 @@ async function loadCategories() {
       <table cellpadding="12">
         <thead>
           <tr>
-            <th style="width:50px">ID</th>
+            <th class="hide-mobile" style="width:50px">ID</th>
             <th style="width:140px">Tên Loại</th>
             <th>Từ khóa</th>
-            <th style="width:90px">Ưu tiên</th>
+            <th class="hide-mobile" style="width:90px">Ưu tiên</th>
             <th style="width:140px">Thao tác</th>
           </tr>
         </thead>
         <tbody>
           ${j.rows.map(cat => `
             <tr>
-              <td style="color:var(--muted)">${cat.id}</td>
-              <td><input id="name_${cat.id}" value="${cat.name}" style="font-weight:700" /></td>
-              <td><input id="kw_${cat.id}" value="${cat.keywords}" /></td>
-              <td><input id="prio_${cat.id}" type="number" value="${cat.priority || 0}" style="text-align:center" /></td>
+              <td class="hide-mobile" style="color:var(--muted)">${cat.id}</td>
+              <td><input id="name_${cat.id}" value="${cat.name}" style="font-weight:700" title="${cat.name}"/></td>
+              <td><input id="kw_${cat.id}" value="${cat.keywords}" title="${cat.keywords}"/></td>
+              <td class="hide-mobile"><input id="prio_${cat.id}" type="number" value="${cat.priority || 0}" style="text-align:center" /></td>
               <td>
                 <div class="row" style="gap:8px">
                   <button onclick="saveCategory(${cat.id})" style="background:var(--primary-light); color:var(--primary); padding:6px 12px; font-size:12px">Lưu</button>

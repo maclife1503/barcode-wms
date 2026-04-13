@@ -137,6 +137,8 @@
         const text = await navigator.clipboard.readText();
         document.getElementById("raw").value = text;
         document.getElementById("err").textContent = "";
+        // Tự động tạo mã luôn sau khi paste
+        createItem();
       } catch (e) {
         document.getElementById("err").textContent = "Không thể dán. Hãy cấp quyền truy cập clipboard.";
       }

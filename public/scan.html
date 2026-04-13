@@ -12,30 +12,16 @@
     #modeReturn.active { background: #ea580c !important; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3); }
     #modeInv.active { background: #2563eb !important; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
     
-    .scan-actions button {
-      flex: 1;
-      min-width: 100px;
-      background: white;
-      color: var(--text);
-      border: 1.5px solid var(--border);
-      box-shadow: none;
+    /* Đảm bảo dấu tick ẩn lúc đầu */
+    #scanOk { 
+      opacity: 0; 
+      pointer-events: none; 
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transform: translate(-50%, -50%) scale(0.5);
     }
-    
-    /* Hiệu ứng tia laser quét */
-    .scanner-overlay {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: rgba(79, 70, 229, 0.6);
-      box-shadow: 0 0 8px 2px rgba(79, 70, 229, 0.4);
-      z-index: 10;
-      animation: scanning 2s infinite ease-in-out;
-      display: none;
-    }
-    @keyframes scanning {
-      0% { top: 0%; }
-      50% { top: 100%; }
-      100% { top: 0%; }
+    #scanOk.show { 
+      opacity: 1; 
+      transform: translate(-50%, -50%) scale(1);
     }
   </style>
 </head>
@@ -95,10 +81,15 @@ let lastScannedAtToken = 0;
 function beep(){
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type = "sine"; o.frequency.value = 1400; g.gain.value = 0.05;
-    o.connect(g); g.connect(ctx.destination);
-    o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, 80);
+    const play = (freq, time, dur) => {
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq; g.gain.value = 0.05;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(time); o.stop(time + dur);
+    };
+    play(1400, ctx.currentTime, 0.08); // Bíp
+    play(1600, ctx.currentTime + 0.12, 0.08); // Bíp bíp
+    setTimeout(() => ctx.close(), 500);
   } catch(e) {}
 }
 
