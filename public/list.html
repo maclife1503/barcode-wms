@@ -25,8 +25,8 @@
 
   <!-- Hệ thống Tabs -->
   <div class="row no-print" style="margin-bottom:16px; gap:8px">
-    <button class="tab-btn active" id="tab-all" onclick="setTab('all')">Tất cả</button>
-    <button class="tab-btn" id="tab-stock" onclick="setTab('stock')">Stock (Tồn kho)</button>
+    <button class="tab-btn" id="tab-all" onclick="setTab('all')">Tất cả</button>
+    <button class="tab-btn active" id="tab-stock" onclick="setTab('stock')">Stock (Tồn kho)</button>
     <button class="tab-btn" id="tab-shipped" onclick="setTab('shipped')">Shipped (Đã giao)</button>
     <button class="tab-btn" id="tab-return" onclick="setTab('return')">Return (Hoàn trả)</button>
   </div>
@@ -64,7 +64,7 @@
 
 <script>
 let selectedCategory = null;
-let currentTab = 'all';
+let currentTab = 'stock';
 
 // Thêm style cho Tab
 const style = document.createElement('style');
