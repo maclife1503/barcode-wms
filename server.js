@@ -413,11 +413,11 @@ app.post("/api/items", requireAuth, async (req, res) => {
   }
 });
 
-function buildItemQuery(req) {
   const q = req.query.q;
   const status = req.query.status;
   const inventory = req.query.inventory;
   const tab = req.query.tab;
+  const posted = req.query.posted;
 
   const where = ["is_deleted = 0"];
   const params = [];
@@ -445,6 +445,13 @@ function buildItemQuery(req) {
     where.push(`inventory_status = ?`);
     params.push(inventory);
   }
+
+  if (posted === '1') {
+    where.push(`is_posted = 1`);
+  } else if (posted === '0') {
+    where.push(`is_posted = 0`);
+  }
+
   return { where, params };
 }
 
@@ -453,7 +460,7 @@ app.get("/api/items", requireAuth, async (req, res) => {
   const { where, params } = buildItemQuery(req);
 
   const sql = `
-    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, last_inventory_at, created_at, updated_at, category
+    SELECT id, package_id, name, serial_clean, mvd, status, inventory_status, is_posted, last_inventory_at, created_at, updated_at, category
     FROM items
     WHERE ${where.join(" AND ")}
     ORDER BY datetime(updated_at) DESC
@@ -820,6 +827,28 @@ app.post("/api/items/:id/inventory", requireAuth, async (req, res) => {
       args: [id, inventory_status, req.user, t]
     });
   }
+
+  res.json({ ok: true });
+});
+
+app.post("/api/items/:id/posted", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { is_posted } = req.body;
+
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
+  const item = rows[0];
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const updated_at = nowISO();
+  await db.execute({
+    sql: "UPDATE items SET is_posted = ?, updated_at = ? WHERE id = ?",
+    args: [is_posted ? 1 : 0, updated_at, id]
+  });
+
+  await db.execute({
+    sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
+    args: [id, req.user, JSON.stringify({ is_posted: is_posted ? 1 : 0 }), updated_at]
+  });
 
   res.json({ ok: true });
 });

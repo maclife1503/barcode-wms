@@ -56,6 +56,14 @@
           <option>NOT_IN_STOCK</option>
         </select>
       </div>
+      <div style="width:140px">
+        <label>Đăng bán</label>
+        <select id="posted">
+          <option value="">Tất cả</option>
+          <option value="1">Đã đăng 🏷️</option>
+          <option value="0">Chưa đăng</option>
+        </select>
+      </div>
       <div style="align-self: flex-end; padding-bottom: 2px">
         <button onclick="exportCsv()" style="background:var(--primary); color:white; height:42px; padding:0 16px; font-size:14px">Xuất File</button>
       </div>
@@ -145,10 +153,12 @@ async function load(){
   const qEl = document.getElementById("q");
   const statusEl = document.getElementById("status");
   const inventoryEl = document.getElementById("inventory");
+  const postedEl = document.getElementById("posted");
 
   const u = new URL("/api/items", location.origin);
   if (qEl.value) u.searchParams.set("q", qEl.value);
   if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+  if (postedEl.value) u.searchParams.set("posted", postedEl.value);
   
   // Tab vs Status Dropdown
   if (currentTab !== 'all') {
@@ -166,10 +176,12 @@ async function exportCsv() {
   const qEl = document.getElementById("q");
   const statusEl = document.getElementById("status");
   const inventoryEl = document.getElementById("inventory");
+  const postedEl = document.getElementById("posted");
 
   const u = new URL("/api/items/export", location.origin);
   if (qEl.value) u.searchParams.set("q", qEl.value);
   if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+  if (postedEl.value) u.searchParams.set("posted", postedEl.value);
   
   if (currentTab !== 'all') {
     u.searchParams.set("tab", currentTab);
@@ -256,7 +268,9 @@ function render() {
                 return `
                 <tr style="${isStale ? 'background:#fff1f2' : ''}">
                   <td style="font-weight:600"><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
-                  <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">${esc(r.name)}</td>
+                  <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">
+                    ${r.is_posted ? '<span title="Đã đăng bán">🏷️</span> ' : ''}${esc(r.name)}
+                  </td>
                   <td class="hide-mobile" style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
                   <td><span class="pill" style="background:${r.status==='SHIPPED'?'#dcfce7':'#f1f5f9'}; color:${r.status==='SHIPPED'?'#166534':'var(--text)'}">${esc(r.status)}</span></td>
                   <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status==='IN_STOCK'?'#dbeafe':'#f1f5f9'}">${esc(r.inventory_status)}</span></td>
@@ -288,6 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
   qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
   statusEl.addEventListener("change", load);
   inventoryEl.addEventListener("change", load);
+  document.getElementById("posted").addEventListener("change", load);
 
   load();
 });

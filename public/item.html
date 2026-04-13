@@ -165,6 +165,16 @@ async function setInventory(inventory_status){
   await fetch(`/api/items/${encodeURIComponent(id)}/inventory`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ inventory_status }) });
   loadAll();
 }
+async function togglePosted(){
+  if(!currentItem) return;
+  const next = currentItem.is_posted ? 0 : 1;
+  const r = await fetch(`/api/items/${encodeURIComponent(id)}/posted`, { 
+    method:"POST", 
+    headers:{"Content-Type":"application/json"}, 
+    body:JSON.stringify({ is_posted: next }) 
+  });
+  if(r.ok) loadAll();
+}
 async function delItem(){
   if(!confirm("Xoá sản phẩm này?")) return;
   await fetch(`/api/items/${encodeURIComponent(id)}/delete`, { method: "POST" });
@@ -192,6 +202,7 @@ async function loadItem(){
         <button onclick="setStatus('SHIPPED')">🚚 Giao hàng</button>
         <button onclick="setStatus('HENBIN')" style="background:#fff7ed; color:#c2410c">🔄 Hoàn trả</button>
         <button onclick="setInventory('IN_STOCK')" style="background:#eff6ff; color:#1d4ed8">📦 Vào kho</button>
+        <button onclick="togglePosted()" style="background:#fef9c3; color:#854d0e">🏷️ ${currentItem.is_posted ? 'Hủy đăng bán' : 'Đánh dấu đã đăng'}</button>
         ${showDelete ? `<button onclick="delItem()" style="background:#fef2f2; color:#b91c1c; border:1px solid #fee2e2">Xoá cứng</button>` : ""}
       </div>
 
@@ -201,6 +212,7 @@ async function loadItem(){
         <div class="detail-item"><div class="detail-label">Trạng thái</div><div class="detail-value"><span class="pill">${esc(it.status)}</span></div></div>
         <div class="detail-item"><div class="detail-label">Loại hàng</div><div class="detail-value"><span class="pill" style="background:var(--primary-light)">${esc(it.category)}</span></div></div>
         <div class="detail-item"><div class="detail-label">Tồn kho</div><div class="detail-value"><span class="pill">${esc(it.inventory_status)}</span></div></div>
+        <div class="detail-item"><div class="detail-label">Đăng bán</div><div class="detail-value">${it.is_posted ? '<span class="pill" style="background:#fef9c3; color:#854d0e">🏷️ Đã đăng</span>' : '<span class="pill" style="background:#f1f5f9; color:var(--muted)">Chưa đăng</span>'}</div></div>
         <div class="detail-item"><div class="detail-label">Lưu kho</div><div class="detail-value">${diffDays} ngày</div></div>
       </div>
 
