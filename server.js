@@ -8,6 +8,7 @@ const cookieParser = require("cookie-parser");
 const QRCode = require("qrcode");
 const crypto = require("crypto");
 const FormData = require("form-data");
+const { createCanvas, loadImage } = require("canvas");
 const db = require("./db");
 
 const app = express();
@@ -291,6 +292,87 @@ async function sendTelegramPhoto(imageBuffer, caption = "") {
   }
 }
 
+// ====== Image Label Generation (Mirror Frontend) ======
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+  const words = (text || "").split(/\s+/).filter(Boolean);
+  let line = "";
+  let lines = 0;
+  for (let i = 0; i < words.length; i++) {
+    const test = line ? (line + " " + words[i]) : words[i];
+    if (ctx.measureText(test).width <= maxWidth) {
+      line = test;
+    } else {
+      ctx.fillText(line, x, y);
+      y += lineHeight;
+      lines++;
+      if (maxLines && lines >= maxLines) return y;
+      line = words[i];
+    }
+  }
+  if (line) { ctx.fillText(line, x, y); y += lineHeight; }
+  return y;
+}
+
+async function generateLabelBuffer(item, qrBuffer) {
+  const LABEL_W = 548;
+  const LABEL_H = 338;
+  const canvas = createCanvas(LABEL_W, LABEL_H);
+  const ctx = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, LABEL_W, LABEL_H);
+
+  const pad = 7;
+  const qrSize = 326;
+  const qrX = LABEL_W - pad - qrSize;
+  const qrY = pad;
+
+  // Draw QR
+  const qrImg = await loadImage(qrBuffer);
+  ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+  // Left side text
+  const leftX = pad;
+  const textW = qrX - 5 - leftX;
+  
+  ctx.fillStyle = "#000";
+  
+  // MVD
+  ctx.font = "bold 34px sans-serif";
+  let y = pad + 38;
+  ctx.fillText(String(item.mvd || "-").trim(), leftX, y);
+
+  // Serial
+  y += 24;
+  ctx.font = "bold 18px sans-serif";
+  let sn = (item.serial_clean || item.serial_raw || "-").trim();
+  while (ctx.measureText(sn).width > textW && sn.length > 4) { sn = sn.slice(0, -2) + "…"; }
+  ctx.fillText(sn, leftX, y);
+
+  // Name
+  y += 26;
+  ctx.font = "bold 20px sans-serif";
+  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 24, 10);
+
+  // Logo
+  try {
+    const logoRelPath = "public/images/logo.png";
+    const logoFull = path.join(__dirname, logoRelPath);
+    if (fs.existsSync(logoFull)) {
+      const logoImg = await loadImage(logoFull);
+      const scale = Math.min(textW / logoImg.width, 140 / logoImg.height);
+      const dw = logoImg.width * scale;
+      const dh = logoImg.height * scale;
+      ctx.drawImage(logoImg, leftX + (textW - dw) / 2, LABEL_H - pad - dh, dw, dh);
+    }
+  } catch (e) {
+    console.error("Logo draw failed:", e);
+  }
+
+  return canvas.toBuffer("image/png");
+}
+
 async function checkStaleItemsAndNotify(isManual = false) {
   const today = todayKey();
 
@@ -500,8 +582,10 @@ app.post("/api/external/create", async (req, res) => {
       ]
     });
 
-    // Notify Telegram with QR
+    // Notify Telegram with Formatted Label
     const qrBuffer = await QRCode.toBuffer(token, { margin: 1, width: 400 });
+    const labelBuffer = await generateLabelBuffer(fields, qrBuffer);
+
     let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
                     `📦 ID: <code>${package_id}</code>\n` +
                     `🏷 Tên: <b>${escTg(fields.name)}</b>\n` +
@@ -513,7 +597,7 @@ app.post("/api/external/create", async (req, res) => {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/scan.html?token=${token}">Xem chi tiết</a>`;
     }
 
-    sendTelegramPhoto(qrBuffer, caption).catch(e => console.error("Shortcut Telegram notify failed:", e));
+    sendTelegramPhoto(labelBuffer, caption).catch(e => console.error("Shortcut Telegram notify failed:", e));
 
     res.json({ ok: true, package_id, token });
   } catch (e) {
