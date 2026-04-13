@@ -18,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ====== Simple auth (đủ dùng nội bộ) ======
+const USERS = {
   [process.env.ADMIN_USER]: { passwordHash: process.env.ADMIN_PASS, role: "admin" },
   [process.env.STAFF_USER]: { passwordHash: process.env.STAFF_PASS, role: "staff" },
   "bong": { passwordHash: "$2b$10$55BPxlmk/nq6fW9WV9mkFuYD/pdyiHl5gPaV.3CEco/xKcB6.VYVG", role: "entry" },
