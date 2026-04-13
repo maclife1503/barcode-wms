@@ -161,17 +161,38 @@ async function onScanSuccess(decodedText) {
   if(!r.ok){ flashError(); document.getElementById("scanErr").textContent = j.error || "Không tìm thấy mã"; return; }
   
   document.getElementById("scanErr").textContent = "";
-  const it = j.item;
-  renderItem(it);
+  let it = j.item;
 
-  if(MODE === "INVENTORY"){
-    const addRes = await fetch("/api/inventory/add",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({token}) });
-    if(addRes.ok) { flashSuccess(); renderInvTable(); }
+  if (MODE === "INVENTORY") {
+    const addRes = await fetch("/api/inventory/add", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ token }) 
+    });
+    if (addRes.ok) { 
+      it.inventory_status = "IN_STOCK"; // Cập nhật local để hiển thị ngay
+      renderItem(it);
+      flashSuccess(); 
+      renderInvTable(); 
+    }
     else { flashError(); document.getElementById("scanErr").textContent = "Lỗi thêm kiểm kê"; }
   } else {
     const statusMap = { SHIP: "SHIPPED", RETURN: "HENBIN" };
-    await fetch(`/api/items/${it.id}/status`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({to_status: statusMap[MODE]}) });
-    flashSuccess();
+    const toStatus = statusMap[MODE];
+    const updateRes = await fetch(`/api/items/${it.id}/status`, { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ to_status: toStatus }) 
+    });
+    
+    if (updateRes.ok) {
+      it.status = toStatus; // Cập nhật local để hiển thị ngay
+      renderItem(it);
+      flashSuccess();
+    } else {
+      flashError();
+      document.getElementById("scanErr").textContent = "Lỗi cập nhật trạng thái";
+    }
   }
 }
 
