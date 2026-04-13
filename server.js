@@ -224,27 +224,28 @@ async function sendTelegramDocument(filePath, caption = "") {
 
   try {
     const url = `https://api.telegram.org/bot${token}/sendDocument`;
-    const form = new FormData();
+    
+    // Sử dụng Native FormData (Node 18+) để đảm bảo tương thích tốt nhất với native fetch
+    const form = new globalThis.FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption);
     
-    // Đọc file vào Buffer để tránh lỗi luồng (stream) với Telegram
+    // Đọc file và đóng gói vào Blob
     const fileBuffer = fs.readFileSync(filePath);
-    form.append("document", fileBuffer, { 
-      filename: path.basename(filePath) 
-    });
+    const blob = new globalThis.Blob([fileBuffer], { type: "text/csv" });
+    form.append("document", blob, path.basename(filePath));
 
     const res = await fetch(url, {
       method: "POST",
-      body: form,
-      headers: form.getHeaders()
+      body: form
+      // Lưu ý: KHÔNG set Content-Type header thủ công khi dùng native FormData, 
+      // fetch sẽ tự động set boundary cho mình.
     });
     
     if (!res.ok) {
-      const err = await res.text();
-      console.error("Telegram document send failed:", res.status, err);
-      // Ném lỗi để log cụ thể ở tầng API
-      throw new Error(`Telegram rejected with status ${res.status}: ${err}`);
+      const errBody = await res.text();
+      console.error("Telegram document send failed:", res.status, errBody);
+      throw new Error(`Telegram rejected (Status ${res.status}): ${errBody}`);
     }
   } catch (e) {
     console.error("sendTelegramDocument Error:", e.message);
@@ -928,7 +929,8 @@ app.post("/api/telegram/test-all", requireAuth, requireAdmin, async (req, res) =
     
     res.json({ ok: true, message: "Đã gửi tin nhắn và file mẫu tới Telegram. Hãy kiểm tra điện thoại của bạn!" });
   } catch (e) {
-    res.status(500).json({ error: "Kiểm tra thất bại: " + e.message });
+    // Trả về nội dung lỗi chi tiết từ Telegram nếu có
+    res.status(500).json({ error: e.message });
   }
 });
 
