@@ -23,6 +23,14 @@
     <div id="filterPath" style="font-size:14px; color:var(--primary); font-weight:600"></div>
   </div>
 
+  <!-- Hệ thống Tabs -->
+  <div class="row no-print" style="margin-bottom:16px; gap:8px">
+    <button class="tab-btn active" id="tab-all" onclick="setTab('all')">Tất cả</button>
+    <button class="tab-btn" id="tab-stock" onclick="setTab('stock')">Stock (Tồn kho)</button>
+    <button class="tab-btn" id="tab-shipped" onclick="setTab('shipped')">Shipped (Đã giao)</button>
+    <button class="tab-btn" id="tab-return" onclick="setTab('return')">Return (Hoàn trả)</button>
+  </div>
+
   <div class="card no-print">
     <div class="row" style="gap:16px">
       <div style="flex:1; min-width:280px">
@@ -30,7 +38,7 @@
         <input id="q" placeholder="Package ID, Serial, Name..." />
       </div>
       <div style="width:160px">
-        <label>Trạng thái</label>
+        <label>Bộ lọc trạng thái</label>
         <select id="status">
           <option value="">Tất cả</option>
           <option>READY_TO_SHIP</option>
@@ -56,6 +64,28 @@
 
 <script>
 let selectedCategory = null;
+let currentTab = 'all';
+
+// Thêm style cho Tab
+const style = document.createElement('style');
+style.textContent = `
+  .tab-btn {
+    background: white;
+    color: var(--muted);
+    border: 1.5px solid var(--border);
+    padding: 8px 16px;
+    font-size: 14px;
+    box-shadow: none;
+    border-radius: 12px;
+  }
+  .tab-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);
+  }
+`;
+document.head.appendChild(style);
 
 function esc(s){
   return (s ?? "").replace(/[&<>"']/g, m => ({
@@ -87,6 +117,17 @@ async function checkAdmin() {
 }
 checkAdmin();
 
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  
+  // Nếu chọn tab khác All, reset status dropdown để tránh xung đột
+  if (tab !== 'all') document.getElementById("status").value = "";
+  
+  load();
+}
+
 function setFilter(cat) {
   selectedCategory = cat;
   document.getElementById("filterPath").innerHTML = cat 
@@ -104,8 +145,14 @@ async function load(){
 
   const u = new URL("/api/items", location.origin);
   if (qEl.value) u.searchParams.set("q", qEl.value);
-  if (statusEl.value) u.searchParams.set("status", statusEl.value);
   if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+  
+  // Tab vs Status Dropdown
+  if (currentTab !== 'all') {
+    u.searchParams.set("tab", currentTab);
+  } else if (statusEl.value) {
+    u.searchParams.set("status", statusEl.value);
+  }
 
   const r = await fetch(u);
   cachedData = await r.json();

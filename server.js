@@ -230,7 +230,7 @@ async function checkStaleItemsAndNotify(isManual = false) {
       SELECT package_id, name, created_at
       FROM items
       WHERE is_deleted = 0
-        AND status IN ('READY_TO_SHIP', 'CREATED')
+        AND status = 'READY_TO_SHIP'
         AND substr(created_at, 1, 10) < ?
       ORDER BY created_at ASC
       LIMIT 20
@@ -380,16 +380,26 @@ app.get("/api/items", requireAuth, async (req, res) => {
   const where = ["is_deleted = 0"];
   const params = [];
 
+  const tab = req.query.tab;
+
   if (q) {
     where.push(
       `(package_id LIKE ? OR name LIKE ? OR serial_clean LIKE ? OR tracking_code LIKE ?)`
     );
     params.push(like, like, like, like);
   }
-  if (status) {
+  
+  if (tab === 'stock') {
+    where.push(`status IN ('READY_TO_SHIP', 'CREATED')`);
+  } else if (tab === 'shipped') {
+    where.push(`status = 'SHIPPED'`);
+  } else if (tab === 'return') {
+    where.push(`status IN ('HENBIN', 'RETURNED')`);
+  } else if (status) {
     where.push(`status = ?`);
     params.push(status);
   }
+
   if (inventory) {
     where.push(`inventory_status = ?`);
     params.push(inventory);
