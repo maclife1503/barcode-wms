@@ -437,6 +437,8 @@ function buildItemQuery(req) {
     where.push(`status = 'SHIPPED'`);
   } else if (tab === 'return') {
     where.push(`status IN ('HENBIN', 'RETURNED')`);
+  } else if (tab === 'not_posted') {
+    where.push(`is_posted = 0`);
   } else if (status) {
     where.push(`status = ?`);
     params.push(status);

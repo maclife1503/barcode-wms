@@ -29,6 +29,7 @@
     <button class="tab-btn active" id="tab-stock" onclick="setTab('stock')">Stock (Tồn kho)</button>
     <button class="tab-btn" id="tab-shipped" onclick="setTab('shipped')">Shipped (Đã giao)</button>
     <button class="tab-btn" id="tab-return" onclick="setTab('return')">Return (Hoàn trả)</button>
+    <button class="tab-btn" id="tab-not_posted" onclick="setTab('not_posted')">Chưa post 🏷️</button>
   </div>
 
   <div class="card no-print">
@@ -134,7 +135,10 @@ function setTab(tab) {
   document.getElementById(`tab-${tab}`).classList.add('active');
   
   // Nếu chọn tab khác All, reset status dropdown để tránh xung đột
-  if (tab !== 'all') document.getElementById("status").value = "";
+  if (tab !== 'all') {
+    document.getElementById("status").value = "";
+    if (tab === 'not_posted') document.getElementById("posted").value = "";
+  }
   
   load();
 }
