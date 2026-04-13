@@ -413,6 +413,7 @@ app.post("/api/items", requireAuth, async (req, res) => {
   }
 });
 
+function buildItemQuery(req) {
   const q = req.query.q;
   const status = req.query.status;
   const inventory = req.query.inventory;
