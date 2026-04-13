@@ -227,11 +227,10 @@ async function sendTelegramDocument(filePath, caption = "") {
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption);
-    // Tạm thời bỏ parse_mode để test document gửi được không
-    // form.append("parse_mode", "HTML");
     
-    // Rất quan trọng: Phải chỉ định rõ filename cho Telegram
-    form.append("document", fs.createReadStream(filePath), { 
+    // Đọc file vào Buffer để tránh lỗi luồng (stream) với Telegram
+    const fileBuffer = fs.readFileSync(filePath);
+    form.append("document", fileBuffer, { 
       filename: path.basename(filePath) 
     });
 
@@ -240,12 +239,16 @@ async function sendTelegramDocument(filePath, caption = "") {
       body: form,
       headers: form.getHeaders()
     });
+    
     if (!res.ok) {
       const err = await res.text();
-      console.error("Telegram document send failed status:", res.status, err);
+      console.error("Telegram document send failed:", res.status, err);
+      // Ném lỗi để log cụ thể ở tầng API
+      throw new Error(`Telegram rejected with status ${res.status}: ${err}`);
     }
   } catch (e) {
-    console.error("Telegram document send failed:", e);
+    console.error("sendTelegramDocument Error:", e.message);
+    throw e;
   }
 }
 
@@ -912,6 +915,23 @@ app.get("/api/items/:id/history", requireAuth, async (req, res) => {
 });
 
 // ====== Telegram Test API ======
+app.post("/api/telegram/test-all", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    // 1. Thử gửi tin nhắn
+    await sendTelegramMessage("🔔 <b>Hệ thống WMS:</b> Đang kiểm tra kết nối Bot...");
+    
+    // 2. Thử tạo và gửi file mẫu
+    const testFile = path.join(EXPORT_DIR, "test_connection.csv");
+    fs.writeFileSync(testFile, "ID,Name,Status\n1,Test Item,Success", "utf8");
+    
+    await sendTelegramDocument(testFile, "📄 Đây là tệp tin kiểm tra từ hệ thống WMS.");
+    
+    res.json({ ok: true, message: "Đã gửi tin nhắn và file mẫu tới Telegram. Hãy kiểm tra điện thoại của bạn!" });
+  } catch (e) {
+    res.status(500).json({ error: "Kiểm tra thất bại: " + e.message });
+  }
+});
+
 app.post("/api/telegram/test", requireAuth, requireAdmin, async (req, res) => {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;

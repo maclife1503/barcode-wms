@@ -49,13 +49,16 @@
     </div>
   </div>
 
-  <div class="card" style="border-left:5px solid var(--primary)">
-    <h3 style="margin-bottom:12px">Công cụ bảo trì</h3>
-    <p style="font-size:13px; color:var(--muted); margin-bottom:16px">Sau khi thay đổi từ khóa, bạn hãy chạy lại bộ phân loại để cập nhật nhãn cho TOÀN BỘ kho hàng hiện có.</p>
-    <button onclick="reclassify()" id="reBtn" style="padding:14px 24px">
-      🔄 Chạy lại bộ phân loại toàn kho
-    </button>
     <div id="reMsg" style="margin-top:12px; font-weight:600; font-size:14px"></div>
+  </div>
+
+  <div class="card" style="border-left:5px solid #2563eb; background:#f8faff">
+    <h3 style="margin-bottom:12px">Telegram Bot</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:16px">Kiểm tra kết nối và quyền của Bot Telegram (Gửi tin nhắn & Gửi file CSV).</p>
+    <button onclick="testBot()" id="testBotBtn" style="background:#2563eb; color:white; padding:12px 24px">
+      🤖 Kiểm tra kết nối Bot
+    </button>
+    <div id="testBotMsg" style="margin-top:12px; font-weight:600; font-size:14px"></div>
   </div>
 
 <script>
@@ -138,6 +141,19 @@ async function reclassify() {
     if (r.ok) { msg.textContent = `✅ Thành công! Đã cập nhật xong ${j.count} sản phẩm.`; msg.style.color = "#16a34a"; }
     else { msg.textContent = "❌ Lỗi: " + j.error; msg.style.color = "#ef4444"; }
   } catch (e) { msg.textContent = "❌ Lỗi kết nối."; msg.style.color = "#ef4444"; }
+  finally { btn.disabled = false; }
+}
+
+async function testBot() {
+  const btn = document.getElementById("testBotBtn"); const msg = document.getElementById("testBotMsg");
+  btn.disabled = true; msg.textContent = "⏳ Đang kiểm tra... Hãy chờ tin nhắn Telegram."; msg.style.color = "#2563eb";
+
+  try {
+    const r = await fetch("/api/telegram/test-all", { method: "POST" });
+    const j = await r.json();
+    if (r.ok) { msg.textContent = `✅ ${j.message}`; msg.style.color = "#16a34a"; }
+    else { msg.textContent = "❌ Lỗi: " + (j.error || "Gửi thất bại"); msg.style.color = "#ef4444"; }
+  } catch (e) { msg.textContent = "❌ Lỗi kết nối server."; msg.style.color = "#ef4444"; }
   finally { btn.disabled = false; }
 }
 
