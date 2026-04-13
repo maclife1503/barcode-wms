@@ -443,7 +443,7 @@ function buildItemQuery(req) {
   } else if (tab === 'return') {
     where.push(`status IN ('HENBIN', 'RETURNED')`);
   } else if (tab === 'not_posted') {
-    where.push(`is_posted = 0`);
+    where.push(`is_posted = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN')`);
   } else if (status) {
     where.push(`status = ?`);
     params.push(status);
