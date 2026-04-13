@@ -241,17 +241,47 @@ function renderItem(it) {
 async function renderInvTable(){
   const r = await fetch("/api/inventory/today"); const j = await r.json();
   const rows = j.rows || [];
+  
+  // Tính toán thống kê
+  const stats = {};
+  rows.forEach(row => {
+    const cat = row.category || 'khác';
+    stats[cat] = (stats[cat] || 0) + 1;
+  });
+  const sortedStats = Object.entries(stats).sort((a,b) => b[1] - a[1]);
+
   document.getElementById("invBox").innerHTML = `
     <div class="card">
-      <div class="row" style="justify-content:space-between; margin-bottom:12px">
-        <h3 style="margin:0">Kiểm kê hôm nay</h3>
-        <button onclick="downloadInvCsv()" style="padding:8px 12px; font-size:13px">Xuất File</button>
+      <div class="row" style="justify-content:space-between; margin-bottom:12px; align-items:flex-start">
+        <div>
+          <h3 style="margin:0">Kiểm kê hôm nay</h3>
+          <div style="font-size:13px; color:var(--muted); margin-top:4px">Tổng: <b>${rows.length}</b> món</div>
+        </div>
+        <div class="row" style="gap:8px">
+          <button onclick="resetInventory()" style="padding:8px 12px; font-size:13px; background:#fee2e2; color:#991b1b; box-shadow:none">Làm mới kho</button>
+          <button onclick="downloadInvCsv()" style="padding:8px 12px; font-size:13px">Xuất File</button>
+        </div>
       </div>
+
+      <!-- Thống kê loại hàng (Dashboard mini) -->
+      <div class="row" style="gap:8px; margin-bottom:16px; flex-wrap:wrap">
+        ${sortedStats.map(([cat, count]) => `
+          <div style="background:var(--primary-light); color:var(--primary); padding:6px 12px; border-radius:10px; font-size:12px; font-weight:700">
+            ${esc(cat)}: ${count}
+          </div>
+        `).join("")}
+      </div>
+
       <div class="table-wrap">
         <table cellpadding="10">
-          <thead><tr><th>Sản phẩm</th><th>Serial</th><th>Mã vận đơn</th></tr></thead>
+          <thead><tr><th>Sản phẩm</th><th>Serial</th><th class="hide-mobile">Mã vận đơn</th><th class="hide-mobile">Loại</th></tr></thead>
           <tbody>
-            ${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.serial)}</td><td>${esc(r.mvd)}</td></tr>`).join("")}
+            ${rows.map(r=>`<tr>
+              <td style="font-weight:600">${esc(r.name)}</td>
+              <td style="font-family:monospace; font-size:13px">${esc(r.serial)}</td>
+              <td class="hide-mobile">${esc(r.mvd)}</td>
+              <td class="hide-mobile"><span class="pill">${esc(r.category || "-")}</span></td>
+            </tr>`).join("")}
           </tbody>
         </table>
       </div>
@@ -259,12 +289,31 @@ async function renderInvTable(){
   `;
 }
 
+async function resetInventory() {
+  if (!confirm("⚠️ CẢNH BÁO: Hành động này sẽ đặt LẠI TOÀN BỘ trạng thái kiểm kho của tất cả sản phẩm về 'UNKNOWN'. Bạn có chắc chắn muốn thực hiện?")) return;
+  
+  const r = await fetch("/api/inventory/reset", { method: "POST" });
+  if (r.ok) {
+    alert("Đã reset trạng thái kiểm kho thành công.");
+    location.reload();
+  } else {
+    alert("Có lỗi xảy ra khi reset.");
+  }
+}
+
 async function downloadInvCsv(){
-  if(!confirm("Xuất CSV và làm sạch bảng kiểm kê hôm nay?")) return;
+  if(!confirm("Xuất CSV Audit và làm sạch bảng kiểm kê hôm nay (di chuyển vào Lịch sử)?")) return;
   const r = await fetch("/api/inventory/export", { method:"POST" });
   const j = await r.json();
-  if(j.url) { window.open(j.url, "_blank"); renderInvTable(); }
+  if(j.url) { 
+    window.open(j.url, "_blank"); 
+    renderInvTable(); 
+  }
 }
+async function checkInventoryToday(){
+  if(MODE === "INVENTORY") renderInvTable();
+}
+setInterval(checkInventoryToday, 60000); // Tự động refresh nhẹ mỗi phút
 </script>
 </body>
 </html>

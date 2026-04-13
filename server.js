@@ -483,10 +483,11 @@ app.get("/api/inventory/today", requireAuth, async (req, res) => {
   const date_key = yyyymmddLocal();
   const { rows } = await db.execute({
     sql: `
-    SELECT package_id, name, serial, mvd, scanned_at, actor, token
-    FROM inventory_work
-    WHERE date_key = ?
-    ORDER BY datetime(scanned_at) DESC
+    SELECT w.package_id, w.name, w.serial, w.mvd, w.scanned_at, w.actor, w.token, i.category
+    FROM inventory_work w
+    LEFT JOIN items i ON w.item_id = i.id
+    WHERE w.date_key = ?
+    ORDER BY datetime(w.scanned_at) DESC
   `,
     args: [date_key]
   });
@@ -535,26 +536,44 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
 
   try {
     const tx = await db.transaction("write");
-    const { rows } = await tx.execute({
+    
+    // 1. Lấy hàng đã quét hôm nay (kèm category)
+    const { rows: scanned } = await tx.execute({
       sql: `
-      SELECT package_id, name, serial, mvd, scanned_at, actor
-      FROM inventory_work
-      WHERE date_key = ?
-      ORDER BY datetime(scanned_at) DESC
-    `,
+        SELECT w.package_id, w.name, w.serial, w.mvd, w.scanned_at, w.actor, 'OK' as audit_status, i.category
+        FROM inventory_work w
+        LEFT JOIN items i ON w.item_id = i.id
+        WHERE w.date_key = ?
+        ORDER BY datetime(w.scanned_at) DESC
+      `,
       args: [date_key]
     });
 
-    if (rows.length === 0) {
+    // 2. Lấy hàng còn đang UNKNOWN (chưa quét - kèm category)
+    const { rows: missing } = await tx.execute({
+      sql: `
+        SELECT package_id, name, serial_clean as serial, mvd, '-' as scanned_at, '-' as actor, 'MISSING' as audit_status, category
+        FROM items
+        WHERE inventory_status = 'UNKNOWN' AND is_deleted = 0
+        ORDER BY category ASC, name ASC
+      `,
+      args: []
+    });
+
+    const allRows = [...scanned, ...missing];
+
+    if (allRows.length === 0) {
       await tx.rollback();
       return res.json({ ok: true, url: null, count: 0, message: "No data" });
     }
 
-    const header = ["time", "package_id", "mvd", "serial", "name", "actor"];
+    const header = ["status", "category", "time", "package_id", "mvd", "serial", "name", "actor"];
     const csv = [header.join(",")]
       .concat(
-        rows.map((r) =>
+        allRows.map((r) =>
           [
+            csvCell(r.audit_status),
+            csvCell(r.category || "unknown"),
             csvCell(r.scanned_at),
             csvCell(r.package_id),
             csvCell(r.mvd),
@@ -566,7 +585,7 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
       )
       .join("\n");
 
-    const filename = `inventory_${date_key}_${Date.now()}.csv`;
+    const filename = `inventory_audit_${date_key}_${Date.now()}.csv`;
     const filePath = path.join(EXPORT_DIR, filename);
 
     fs.writeFileSync(filePath, csv, "utf8");
@@ -578,7 +597,7 @@ app.post("/api/inventory/export", requireAuth, async (req, res) => {
       INSERT INTO inventory_exports(date_key, actor, filename, url, row_count, created_at)
       VALUES(?,?,?,?,?,?)
     `,
-      args: [date_key, req.user, filename, url, rows.length, nowISO()]
+      args: [date_key, req.user, filename, url, allRows.length, nowISO()]
     });
 
     await tx.execute({
