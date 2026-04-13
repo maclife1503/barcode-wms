@@ -843,15 +843,20 @@ app.post("/api/items/:id/posted", requireAuth, async (req, res) => {
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const updated_at = nowISO();
+  const next_val = is_posted ? 1 : 0;
+  
   await db.execute({
     sql: "UPDATE items SET is_posted = ?, updated_at = ? WHERE id = ?",
-    args: [is_posted ? 1 : 0, updated_at, id]
+    args: [next_val, updated_at, id]
   });
 
-  await db.execute({
-    sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
-    args: [id, req.user, JSON.stringify({ is_posted: is_posted ? 1 : 0 }), updated_at]
-  });
+  // Chỉ ghi log nếu giá trị thực sự thay đổi
+  if (item.is_posted !== next_val) {
+    await db.execute({
+      sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
+      args: [id, req.user, JSON.stringify({ is_posted: next_val }), updated_at]
+    });
+  }
 
   res.json({ ok: true });
 });
@@ -885,16 +890,19 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
       }
 
       for (const item of rows) {
-        await db.execute({
-          sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?",
-          args: [updated_at, item.id]
-        });
-        
-        await db.execute({
-          sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
-          args: [item.id, req.user, JSON.stringify({ is_posted: 1, method: "batch" }), updated_at]
-        });
-        totalUpdated++;
+        // Chỉ cập nhật và ghi log nếu máy chưa đăng
+        if (!item.is_posted) {
+          await db.execute({
+            sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?",
+            args: [updated_at, item.id]
+          });
+          
+          await db.execute({
+            sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
+            args: [item.id, req.user, JSON.stringify({ is_posted: 1, method: "batch" }), updated_at]
+          });
+          totalUpdated++;
+        }
       }
     }
 

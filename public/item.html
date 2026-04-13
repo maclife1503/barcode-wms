@@ -247,7 +247,16 @@ async function loadHistory() {
     let icon = "⚪", content = "";
     if (h.type === "status") { icon = "🚚"; content = `Cập nhật trạng thái: <b>${esc(h.from_status)}</b> ➔ <b>${esc(h.to_status)}</b>`; }
     else if (h.type === "inventory") { icon = "📦"; content = `Kiểm kho: <b>${esc(h.action)}</b>`; }
-    else if (h.type === "edit") { icon = "✏️"; content = `Sửa thông tin: ` + JSON.parse(h.changes_json || "{}"); }
+    else if (h.type === "edit") { 
+      const changes = JSON.parse(h.changes_json || "{}");
+      if ("is_posted" in changes) {
+        icon = "🏷️";
+        content = changes.is_posted ? "Đã đánh dấu <b>Đăng bán</b>" : "Đã <b>Hủy đăng bán</b>";
+      } else {
+        icon = "✏️"; 
+        content = `Sửa thông tin: ` + JSON.stringify(changes); 
+      }
+    }
     else if (h.type === "created") { icon = "🆕"; content = `Sản phẩm được tạo mới`; }
     return `
       <div class="timeline-item">
