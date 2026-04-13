@@ -876,11 +876,12 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
     const updated_at = nowISO();
     let totalUpdated = 0;
     const notFound = [];
+    const alreadyPosted = [];
 
     for (const sn of serials) {
       // Tìm máy theo serial_clean hoặc serial_raw
       const { rows } = await db.execute({
-        sql: "SELECT id FROM items WHERE (serial_clean = ? OR serial_raw = ?) AND is_deleted = 0",
+        sql: "SELECT id, is_posted FROM items WHERE (serial_clean = ? OR serial_raw = ?) AND is_deleted = 0",
         args: [sn, sn]
       });
 
@@ -890,7 +891,6 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
       }
 
       for (const item of rows) {
-        // Chỉ cập nhật và ghi log nếu máy chưa đăng
         if (!item.is_posted) {
           await db.execute({
             sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?",
@@ -902,11 +902,14 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
             args: [item.id, req.user, JSON.stringify({ is_posted: 1, method: "batch" }), updated_at]
           });
           totalUpdated++;
+        } else {
+          // Nếu đã đăng rồi, thêm vào danh sách bỏ qua để báo cáo
+          if (!alreadyPosted.includes(sn)) alreadyPosted.push(sn);
         }
       }
     }
 
-    res.json({ ok: true, count: totalUpdated, notFound });
+    res.json({ ok: true, count: totalUpdated, notFound, alreadyPosted });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

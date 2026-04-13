@@ -199,7 +199,15 @@
         });
         const j = await r.json();
         if (r.ok) {
-          let html = `✅ Thành công! Đã cập nhật ${j.count} máy.`;
+          let html = `✅ Thành công! Đã cập nhật mẫu mới cho ${j.count} máy.`;
+          
+          if (j.alreadyPosted && j.alreadyPosted.length > 0) {
+            html += `<div style="margin-top:10px; padding:10px; background:#eff6ff; color:#1d4ed8; border-radius:8px; font-size:13px; font-family:monospace">
+              <b>ℹ️ Đã đăng từ trước (${j.alreadyPosted.length}):</b><br>
+              ${j.alreadyPosted.join(", ")}
+            </div>`;
+          }
+          
           if (j.notFound && j.notFound.length > 0) {
             html += `<div style="margin-top:10px; padding:10px; background:#fff1f2; color:#be123c; border-radius:8px; font-size:13px; font-family:monospace">
               <b>❌ Số Serial không tìm thấy (${j.notFound.length}):</b><br>
@@ -208,7 +216,7 @@
           }
           msg.innerHTML = html;
           msg.style.color = "#16a34a";
-          if (j.count > 0) input.value = ""; // Chỉ xóa nếu có ít nhất 1 cái thành công
+          if (j.count > 0) input.value = ""; 
         } else {
           msg.textContent = "❌ Lỗi: " + (j.error || "Thử lại sau");
           msg.style.color = "#ef4444";
