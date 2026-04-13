@@ -44,6 +44,7 @@
       <button id="modeInv" onclick="setMode('INVENTORY')">Inventory</button>
     </div>
     <div id="modeHint" style="margin-top:12px; font-size:13px; color:var(--muted); font-weight:500"></div>
+    <div id="scanSuccess" style="margin-top:8px; color:#16a34a; font-weight:700; font-size:15px; display:none"></div>
     <div id="scanErr" style="margin-top:8px; color:#ef4444; font-weight:600; font-size:14px"></div>
   </div>
 
@@ -174,6 +175,10 @@ async function onScanSuccess(decodedText) {
       renderItem(it);
       flashSuccess(); 
       renderInvTable(); 
+      const sEl = document.getElementById("scanSuccess");
+      sEl.textContent = `✅ Đã kiểm kê: ${it.name}`;
+      sEl.style.display = "block";
+      setTimeout(() => sEl.style.display = "none", 3000);
     }
     else { flashError(); document.getElementById("scanErr").textContent = "Lỗi thêm kiểm kê"; }
   } else {
@@ -189,6 +194,10 @@ async function onScanSuccess(decodedText) {
       it.status = toStatus; // Cập nhật local để hiển thị ngay
       renderItem(it);
       flashSuccess();
+      const sEl = document.getElementById("scanSuccess");
+      sEl.textContent = `✅ Đã chuyển thành ${toStatus}`;
+      sEl.style.display = "block";
+      setTimeout(() => sEl.style.display = "none", 3000);
     } else {
       flashError();
       document.getElementById("scanErr").textContent = "Lỗi cập nhật trạng thái";
