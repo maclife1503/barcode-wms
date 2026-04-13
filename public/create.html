@@ -35,7 +35,7 @@
     <div id="err" style="margin-top:10px; color:#ef4444; font-weight:600; font-size:14px"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="batchPostedSection">
     <h3 style="margin-bottom:12px">Cập nhật trạng thái Đã đăng bán (Batch)</h3>
     <p style="color:var(--muted); font-size:13px; margin-bottom:12px">Nhập danh sách Serial (cách nhau bởi dấu phẩy hoặc xuống dòng) để đánh dấu đã đăng bán cho hàng loạt máy.</p>
     <textarea id="batchSerials" placeholder="SN12345, SN67890..." style="height:80px"></textarea>
@@ -130,10 +130,12 @@
       if (j.role === 'admin') {
         document.getElementById("navSettings").style.display = "inline-block";
       } else if (j.role === 'entry') {
-        // Cho phép vào trang nhưng ẩn phần tạo tem
         document.getElementById("navScan").style.display = "none";
         document.getElementById("navInventory").style.display = "none";
         document.getElementById("qrCreationSection").style.display = "none";
+      } else if (j.role === 'staff') {
+        // Staff không thấy phần Batch Posted theo yêu cầu
+        document.getElementById("batchPostedSection").style.display = "none";
       }
     }
     checkAuth();
