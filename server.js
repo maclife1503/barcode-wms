@@ -381,6 +381,69 @@ function parsePayload(text) {
   };
 }
 
+// ====== Create item + label ======
+app.post("/api/items", requireAuth, requireStaff, async (req, res) => {
+  try {
+    const { raw_text } = req.body;
+    const fields = parsePayload(raw_text);
+
+    if (!fields.serial_clean) {
+      return res.status(400).json({ error: "Thiếu/không nhận diện được serial trong JSON." });
+    }
+
+    const { rows: existRows } = await db.execute({
+      sql: `
+      SELECT id, package_id, name, serial_clean
+      FROM items
+      WHERE serial_clean = ?
+        AND is_deleted = 0
+      LIMIT 1
+    `,
+      args: [fields.serial_clean]
+    });
+    const existed = existRows[0];
+
+    if (existed) {
+      return res.status(409).json({
+        error: "Đã có item này (serial trùng) và đang tồn tại.",
+        existed,
+      });
+    }
+
+    const package_id = await nextPackageId();
+    const token = genToken();
+
+    const t = nowISO();
+    try {
+      await db.execute({
+        sql: `
+        INSERT INTO items (
+          package_id, token,
+          name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
+          status, inventory_status,
+          created_at, updated_at,
+          is_deleted, created_by, category
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?, ?)
+      `,
+        args: [
+          package_id, token,
+          fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
+          t, t, req.user, detectCategory(fields.name)
+        ]
+      });
+    } catch (e) {
+      if (String(e.message || "").toLowerCase().includes("unique")) {
+        return res.status(409).json({ error: "Đã có item này (serial trùng) và đang tồn tại." });
+      }
+      throw e;
+    }
+
+    const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
+    const item = itemRows[0];
+
+    const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(token)}`;
+    const qrDataUrl = await QRCode.toDataURL(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
+
     res.json({ item, scanUrl, qrDataUrl });
   } catch (e) {
     res.status(400).json({ error: e.message || "Create failed" });
