@@ -524,7 +524,7 @@ app.post("/api/items", requireAuth, requireStaff, async (req, res) => {
     const item = itemRows[0];
 
     const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(token)}`;
-    const qrDataUrl = await QRCode.toDataURL(token, { margin: 1, width: 400, errorCorrectionLevel: 'M' });
+    const qrDataUrl = await QRCode.toDataURL(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
 
     res.json({ item, scanUrl, qrDataUrl });
   } catch (e) {
@@ -583,7 +583,7 @@ app.post("/api/external/create", async (req, res) => {
     });
 
     // Notify Telegram with Formatted Label
-    const qrBuffer = await QRCode.toBuffer(token, { margin: 1, width: 400, errorCorrectionLevel: 'M' });
+    const qrBuffer = await QRCode.toBuffer(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
     const labelBuffer = await generateLabelBuffer(fields, qrBuffer);
 
     let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
@@ -1171,7 +1171,7 @@ app.get("/api/items/:id", requireAuth, async (req, res) => {
   if (!item) return res.status(404).json({ error: "Not found" });
 
   const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(item.token)}`;
-  const qrDataUrl = await QRCode.toDataURL(item.token, { margin: 1, width: 600, errorCorrectionLevel: 'L' });
+  const qrDataUrl = await QRCode.toDataURL(item.token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
 
   res.json({ item, scanUrl, qrDataUrl });
 });
