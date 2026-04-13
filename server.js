@@ -262,6 +262,35 @@ async function sendTelegramDocument(filePath, caption = "") {
   }
 }
 
+async function sendTelegramPhoto(imageBuffer, caption = "") {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = String(process.env.TELEGRAM_CHAT_ID);
+  if (!token || !chatId) return;
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+    const form = new globalThis.FormData();
+    form.append("chat_id", chatId);
+    form.append("caption", caption);
+    form.append("parse_mode", "HTML");
+
+    const blob = new globalThis.Blob([imageBuffer], { type: "image/png" });
+    form.append("photo", blob, "qr_code.png");
+
+    const res = await fetch(url, {
+      method: "POST",
+      body: form
+    });
+    
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Telegram photo send failed:", res.status, errBody);
+    }
+  } catch (e) {
+    console.error("sendTelegramPhoto Error:", e.message);
+  }
+}
+
 async function checkStaleItemsAndNotify(isManual = false) {
   const today = todayKey();
 
@@ -352,73 +381,81 @@ function parsePayload(text) {
   };
 }
 
-// ====== Create item + label ======
-app.post("/api/items", requireAuth, requireStaff, async (req, res) => {
-  try {
-    const { raw_text } = req.body;
-    const fields = parsePayload(raw_text);
+    res.json({ item, scanUrl, qrDataUrl });
+  } catch (e) {
+    res.status(400).json({ error: e.message || "Create failed" });
+  }
+});
 
-    if (!fields.serial_clean) {
-      return res.status(400).json({ error: "Thiếu/không nhận diện được serial trong JSON." });
+// ====== Shortcut API: Create item via external POST ======
+app.post("/api/external/create", async (req, res) => {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey || apiKey !== process.env.SHORTCUT_API_KEY) {
+    return res.status(401).json({ error: "Unauthorized. Missing or invalid x-api-key header." });
+  }
+
+  try {
+    const fields = {
+      name: (req.body.name ?? "").trim(),
+      serial_raw: (req.body.serial ?? "").trim(),
+      condition: (req.body.condition ?? "Unknown").trim(),
+      mvd: (req.body.mvd ?? "").trim(),
+      note: (req.body.note ?? "").trim(),
+      battery: (req.body.battery ?? "").trim(),
+      coverage: (req.body.coverage ?? "").trim(),
+    };
+
+    fields.serial_clean = (fields.serial_raw.match(/[A-Z0-9]{6,}/i)?.[0] ?? "").trim();
+
+    if (!fields.name || !fields.serial_clean) {
+      return res.status(400).json({ error: "Thiếu tên sản phẩm hoặc serial hợp lệ." });
     }
 
+    // Check duplicate
     const { rows: existRows } = await db.execute({
-      sql: `
-      SELECT id, package_id, name, serial_clean
-      FROM items
-      WHERE serial_clean = ?
-        AND is_deleted = 0
-      LIMIT 1
-    `,
+      sql: `SELECT package_id FROM items WHERE serial_clean = ? AND is_deleted = 0 LIMIT 1`,
       args: [fields.serial_clean]
     });
-    const existed = existRows[0];
-
-    if (existed) {
-      return res.status(409).json({
-        error: "Đã có item này (serial trùng) và đang tồn tại.",
-        existed,
-      });
+    if (existRows[0]) {
+      return res.status(409).json({ error: "Sản phẩm đã tồn tại.", package_id: existRows[0].package_id });
     }
 
     const package_id = await nextPackageId();
     const token = genToken();
-
-    // ... insert ...
     const t = nowISO();
-    try {
-      await db.execute({
-        sql: `
+
+    await db.execute({
+      sql: `
         INSERT INTO items (
-          package_id, token,
-          name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
-          status, inventory_status,
-          created_at, updated_at,
-          is_deleted, created_by, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?, ?)
+          package_id, token, name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
+          status, inventory_status, created_at, updated_at, is_deleted, created_by, category
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, 'shortcut', ?)
       `,
-        args: [
-          package_id, token,
-          fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
-          t, t, req.user, detectCategory(fields.name)
-        ]
-      });
-    } catch (e) {
-      if (String(e.message || "").toLowerCase().includes("unique")) {
-        return res.status(409).json({ error: "Đã có item này (serial trùng) và đang tồn tại." });
-      }
-      throw e;
+      args: [
+        package_id, token, fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
+        t, t, detectCategory(fields.name)
+      ]
+    });
+
+    // Notify Telegram with QR
+    const qrBuffer = await QRCode.toBuffer(token, { margin: 1, width: 400 });
+    let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
+                    `📦 ID: <code>${package_id}</code>\n` +
+                    `🏷 Tên: <b>${escTg(fields.name)}</b>\n` +
+                    `🔢 Serial: <code>${fields.serial_clean}</code>\n` +
+                    `💎 Tình trạng: ${escTg(fields.condition)}\n` +
+                    `📅 Ngày tạo: ${fmtTimeLocal(t)}`;
+    
+    if (process.env.APP_URL) {
+      caption += `\n\n🔗 <a href="${process.env.APP_URL}/scan.html?token=${token}">Xem chi tiết</a>`;
     }
 
-    const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
-    const item = itemRows[0];
+    sendTelegramPhoto(qrBuffer, caption).catch(e => console.error("Shortcut Telegram notify failed:", e));
 
-    const scanUrl = `${req.protocol}://${req.get("host")}/scan.html?token=${encodeURIComponent(token)}`;
-    const qrDataUrl = await QRCode.toDataURL(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
-
-    res.json({ item, scanUrl, qrDataUrl });
+    res.json({ ok: true, package_id, token });
   } catch (e) {
-    res.status(400).json({ error: e.message || "Create failed" });
+    console.error("Shortcut API failed:", e);
+    res.status(500).json({ error: e.message || "Shortcut processing failed" });
   }
 });
 
