@@ -68,8 +68,8 @@ async function load(){
   const box = document.getElementById("box");
   setStatus("Đang tải dữ liệu...");
   try{
-    const r = await fetch("/api/inventory/exports", { cache: "no-store" });
-    const rows = await r.json();
+    const res = await r.json();
+    const rows = res.rows || [];
     setStatus("Tải thành công");
 
     if(!rows.length){
