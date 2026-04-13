@@ -33,6 +33,7 @@
       <div class="row" style="flex-wrap:wrap">
         <input id="newCatName" placeholder="Tên loại (vd: iphone)" style="flex:1; min-width:150px" />
         <input id="newCatKeywords" placeholder="Từ khóa (cách nhau bằng dấu phẩy)" style="flex:2; min-width:250px" />
+        <input id="newCatPrio" type="number" placeholder="Ưu tiên (vd: 10)" style="width:100px" />
         <button onclick="saveCategory()">Thêm mới</button>
       </div>
     </div>
@@ -68,21 +69,23 @@ async function loadCategories() {
 
   const list = document.getElementById("categoryList");
   list.innerHTML = `
-    <table cellpadding="10" cellspacing="0" border="1" style="width:100%; border-collapse:collapse; font-size:14px">
+    <table cellpadding="10" cellspacing="0" border="1" style="width:100%; border-collapse:collapse; font-size:13px">
       <tr style="background:#fafafa">
-        <th>ID</th>
-        <th>Tên Loại</th>
+        <th style="width:40px">ID</th>
+        <th style="width:120px">Tên Loại</th>
         <th>Từ khóa (Keywords)</th>
-        <th style="width:120px">Thao tác</th>
+        <th style="width:70px">Ưu tiên</th>
+        <th style="width:110px">Thao tác</th>
       </tr>
       ${j.rows.map(cat => `
         <tr>
           <td>${cat.id}</td>
           <td><input id="name_${cat.id}" value="${cat.name}" style="width:90%" /></td>
           <td><input id="kw_${cat.id}" value="${cat.keywords}" style="width:95%" /></td>
+          <td><input id="prio_${cat.id}" type="number" value="${cat.priority || 0}" style="width:50px" /></td>
           <td>
-            <button onclick="saveCategory(${cat.id})" style="padding:4px 8px; background:#e8f0fe; color:#1a73e8; border:1px solid #1a73e8">Lưu</button>
-            <button onclick="deleteCategory(${cat.id})" style="padding:4px 8px; background:#fee; color:#d00; border:1px solid #d00">Xóa</button>
+            <button onclick="saveCategory(${cat.id})" style="padding:4px 6px; background:#e8f0fe; color:#1a73e8; border:1px solid #1a73e8">Lưu</button>
+            <button onclick="deleteCategory(${cat.id})" style="padding:4px 6px; background:#fee; color:#d00; border:1px solid #d00">Xóa</button>
           </td>
         </tr>
       `).join("")}
@@ -96,12 +99,14 @@ async function saveCategory(id = null) {
     payload = {
       id: id,
       name: document.getElementById(`name_${id}`).value.trim(),
-      keywords: document.getElementById(`kw_${id}`).value.trim()
+      keywords: document.getElementById(`kw_${id}`).value.trim(),
+      priority: parseInt(document.getElementById(`prio_${id}`).value) || 0
     };
   } else {
     payload = {
       name: document.getElementById("newCatName").value.trim(),
-      keywords: document.getElementById("newCatKeywords").value.trim()
+      keywords: document.getElementById("newCatKeywords").value.trim(),
+      priority: parseInt(document.getElementById("newCatPrio").value) || 0
     };
   }
 

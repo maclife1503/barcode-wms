@@ -128,26 +128,32 @@ CREATE TABLE IF NOT EXISTS kv_store (
 CREATE TABLE IF NOT EXISTS category_rules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT UNIQUE NOT NULL,
-  keywords TEXT NOT NULL -- dấu phẩy cách nhau
+  keywords TEXT NOT NULL, -- dấu phẩy cách nhau
+  priority INTEGER DEFAULT 0
 );
   `);
+
+  // Migration: Thêm cột priority nếu chưa có
+  try {
+    await db.execute("ALTER TABLE category_rules ADD COLUMN priority INTEGER DEFAULT 0");
+  } catch(e) { /* ignore */ }
 
   // Seed dữ liệu khởi tạo cho category_rules nếu bảng trống
   try {
     const { rows } = await db.execute("SELECT count(*) as count FROM category_rules");
     if (rows[0].count === 0) {
       const initialRules = [
-        ['ipad', 'ipad'],
-        ['keyboard', 'magic,keyboard,key'],
-        ['apple_watch', 'aw,apple watch'],
-        ['pencil', 'pen,pencil'],
-        ['macbook', 'mac,macbook,imac'],
-        ['iphone', 'iphone']
+        ['ipad', 'ipad', 5],
+        ['keyboard', 'magic,keyboard,key', 10],
+        ['apple_watch', 'aw,apple watch', 10],
+        ['pencil', 'pen,pencil', 10],
+        ['macbook', 'mac,macbook,imac', 5],
+        ['iphone', 'iphone', 5]
       ];
-      for (const [name, kw] of initialRules) {
+      for (const [name, kw, prio] of initialRules) {
         await db.execute({
-          sql: "INSERT INTO category_rules (name, keywords) VALUES (?, ?)",
-          args: [name, kw]
+          sql: "INSERT INTO category_rules (name, keywords, priority) VALUES (?, ?, ?)",
+          args: [name, kw, prio]
         });
       }
     }

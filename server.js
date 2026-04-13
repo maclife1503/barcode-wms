@@ -143,7 +143,7 @@ function csvCell(v) {
 let cachedCategories = [];
 async function loadCategories() {
   try {
-    const { rows } = await db.execute("SELECT * FROM category_rules ORDER BY id ASC");
+    const { rows } = await db.execute("SELECT * FROM category_rules ORDER BY priority DESC, id ASC");
     cachedCategories = rows.map(r => ({
       name: r.name,
       keywords: r.keywords.split(",").map(k => k.trim().toLowerCase()).filter(Boolean)
@@ -829,19 +829,19 @@ app.get("/api/categories", requireAuth, requireAdmin, async (req, res) => {
 });
 
 app.post("/api/categories", requireAuth, requireAdmin, async (req, res) => {
-  const { id, name, keywords } = req.body;
+  const { id, name, keywords, priority } = req.body;
   if (!name || !keywords) return res.status(400).json({ error: "Missing name or keywords" });
 
   try {
     if (id) {
       await db.execute({
-        sql: "UPDATE category_rules SET name = ?, keywords = ? WHERE id = ?",
-        args: [name, keywords, id]
+        sql: "UPDATE category_rules SET name = ?, keywords = ?, priority = ? WHERE id = ?",
+        args: [name, keywords, priority || 0, id]
       });
     } else {
       await db.execute({
-        sql: "INSERT INTO category_rules (name, keywords) VALUES (?, ?)",
-        args: [name, keywords]
+        sql: "INSERT INTO category_rules (name, keywords, priority) VALUES (?, ?, ?)",
+        args: [name, keywords, priority || 0]
       });
     }
     await loadCategories(); // Reload cache
