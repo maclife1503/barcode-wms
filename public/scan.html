@@ -40,10 +40,10 @@
 <body>
   <div class="no-print topbar">
     <div class="nav">
-      <a href="/create.html">Create</a>
-      <a href="/list.html">List</a>
-      <a href="/scan.html" class="active">Scan</a>
-      <a href="/inventory.html">Inventory</a>
+      <a href="/create.html" id="navCreate">Create</a>
+      <a href="/list.html" id="navList">List</a>
+      <a href="/scan.html" id="navScan" class="active">Scan</a>
+      <a href="/inventory.html" id="navInventory">Inventory</a>
       <a href="/settings.html" id="navSettings" style="display:none">Settings</a>
     </div>
     <button class="logout-btn" onclick="logout()">Logout</button>
@@ -73,15 +73,19 @@
 
 <script>
 async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
-async function checkAdmin() {
+async function checkAuth() {
   const r = await fetch("/api/me"); const j = await r.json();
   if (j.role === 'admin') {
-    const nav = document.getElementById("navSettings");
-    if (nav) nav.style.display = "inline-block";
+    document.getElementById("navSettings").style.display = "inline-block";
+  } else if (j.role === 'entry') {
+    document.getElementById("navCreate").style.display = "none";
+    document.getElementById("navScan").style.display = "none";
+    document.getElementById("navInventory").style.display = "none";
+    location.href = "/list.html";
   }
 }
-checkAdmin();
-
+checkAuth();
+const scanner = new Html5Qrcode("reader");
 function esc(s){ return (s??"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
 let MODE = null;

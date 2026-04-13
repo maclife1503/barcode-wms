@@ -9,11 +9,11 @@
 <body>
   <div class="no-print topbar">
     <div class="nav">
-      <a href="/create.html">Create</a>
-      <a href="/list.html">List</a>
-      <a href="/scan.html">Scan</a>
-      <a href="/inventory.html">Inventory</a>
-      <a href="/settings.html" class="active">Settings</a>
+      <a href="/create.html" id="navCreate">Create</a>
+      <a href="/list.html" id="navList">List</a>
+      <a href="/scan.html" id="navScan">Scan</a>
+      <a href="/inventory.html" id="navInventory">Inventory</a>
+      <a href="/settings.html" id="navSettings" class="active">Settings</a>
     </div>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
@@ -64,10 +64,17 @@
 <script>
 async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
 
-async function loadCategories() {
-  const meRes = await fetch("/api/me"); const me = await meRes.json();
-  if (me.role !== 'admin') { location.href = "/list.html"; return; }
+async function checkAuth() {
+  const r = await fetch("/api/me"); const j = await r.json();
+  if (j.role === 'admin') {
+    // ok
+  } else {
+    location.href = "/list.html";
+  }
+}
+checkAuth();
 
+async function loadCategories() {
   const r = await fetch("/api/categories"); const j = await r.json();
   if (!r.ok) return;
 

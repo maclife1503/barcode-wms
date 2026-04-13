@@ -18,9 +18,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ====== Simple auth (đủ dùng nội bộ) ======
-const USERS = {
   [process.env.ADMIN_USER]: { passwordHash: process.env.ADMIN_PASS, role: "admin" },
   [process.env.STAFF_USER]: { passwordHash: process.env.STAFF_PASS, role: "staff" },
+  "bong": { passwordHash: "$2b$10$55BPxlmk/nq6fW9WV9mkFuYD/pdyiHl5gPaV.3CEco/xKcB6.VYVG", role: "entry" },
 };
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
@@ -56,6 +56,10 @@ function requireAuth(req, res, next) {
 }
 function requireAdmin(req, res, next) {
   if (req.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  next();
+}
+function requireStaff(req, res, next) {
+  if (req.role !== "admin" && req.role !== "staff") return res.status(403).json({ error: "Staff/Admin only" });
   next();
 }
 
@@ -344,7 +348,7 @@ function parsePayload(text) {
 }
 
 // ====== Create item + label ======
-app.post("/api/items", requireAuth, async (req, res) => {
+app.post("/api/items", requireAuth, requireStaff, async (req, res) => {
   try {
     const { raw_text } = req.body;
     const fields = parsePayload(raw_text);
@@ -484,7 +488,7 @@ app.get("/api/items", requireAuth, async (req, res) => {
   res.json({ rows, summary: summaryRows });
 });
 
-app.post("/api/items/export", requireAuth, async (req, res) => {
+app.post("/api/items/export", requireAuth, requireStaff, async (req, res) => {
   const { where, params } = buildItemQuery(req);
   const date_key = yyyymmddLocal();
 
@@ -557,7 +561,7 @@ app.get("/api/scan/:token", requireAuth, async (req, res) => {
 });
 
 // ====== Inventory work ======
-app.post("/api/inventory/add", requireAuth, async (req, res) => {
+app.post("/api/inventory/add", requireAuth, requireStaff, async (req, res) => {
   const { token } = req.body || {};
   if (!token) return res.status(400).json({ error: "Missing token" });
 
@@ -664,7 +668,7 @@ app.post("/api/inventory/reset", requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
-app.post("/api/inventory/export", requireAuth, async (req, res) => {
+app.post("/api/inventory/export", requireAuth, requireStaff, async (req, res) => {
   const date_key = yyyymmddLocal();
 
   try {
@@ -763,7 +767,7 @@ app.get("/api/inventory/exports", requireAuth, async (req, res) => {
 });
 
 // ====== Update status (ship/henbin) ======
-app.post("/api/items/:id/status", requireAuth, async (req, res) => {
+app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) => {
   const { id } = req.params;
   const { to_status } = req.body;
 
@@ -798,7 +802,7 @@ app.post("/api/items/:id/status", requireAuth, async (req, res) => {
 });
 
 // ====== Inventory: In stock ======
-app.post("/api/items/:id/inventory", requireAuth, async (req, res) => {
+app.post("/api/items/:id/inventory", requireAuth, requireStaff, async (req, res) => {
   const { id } = req.params;
   const { inventory_status } = req.body;
 
@@ -1006,8 +1010,8 @@ app.get("/api/items/:id/history", requireAuth, async (req, res) => {
   res.json({ history });
 });
 
-// ====== Telegram Test API ======
-app.post("/api/telegram/test-all", requireAuth, requireAdmin, async (req, res) => {
+// ====== Telegram Bot Diagnostics ======
+app.post("/api/telegram/test", requireAuth, requireAdmin, async (req, res) => {
   try {
     // 1. Thử gửi tin nhắn
     await sendTelegramMessage("🔔 <b>Hệ thống WMS:</b> Đang kiểm tra kết nối Bot...");

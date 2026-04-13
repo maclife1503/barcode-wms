@@ -85,10 +85,10 @@
 <body>
   <div class="no-print topbar">
     <div class="nav">
-      <a href="/create.html">Create</a>
-      <a href="/list.html">List</a>
-      <a href="/scan.html">Scan</a>
-      <a href="/inventory.html">Inventory</a>
+      <a href="/create.html" id="navCreate">Create</a>
+      <a href="/list.html" id="navList">List</a>
+      <a href="/scan.html" id="navScan">Scan</a>
+      <a href="/inventory.html" id="navInventory">Inventory</a>
       <a href="/settings.html" id="navSettings" style="display:none">Settings</a>
     </div>
     <button class="logout-btn" onclick="logout()">Logout</button>
@@ -189,7 +189,19 @@ async function loadItem(){
 
   const it = json.item; currentItem = it;
   const me = await (await fetch("/api/me")).json();
-  const showDelete = me.role === "admin";
+  const isAdmin = me.role === "admin";
+  const isStaff = me.role === "admin" || me.role === "staff";
+  const isEntry = me.role === "entry";
+  
+  // Update Nav visibility
+  if (isAdmin) {
+    document.getElementById("navSettings").style.display = "inline-block";
+  }
+  if (isEntry) {
+    document.getElementById("navCreate").style.display = "none";
+    document.getElementById("navScan").style.display = "none";
+    document.getElementById("navInventory").style.display = "none";
+  }
   
   const diffDays = Math.ceil(Math.abs(new Date() - new Date(it.created_at)) / 86400000);
   const isStale = diffDays > 15 && (it.status==='READY_TO_SHIP'||it.status==='CREATED');
@@ -199,11 +211,13 @@ async function loadItem(){
       ${isStale ? `<div style="background:#fee2e2; color:#b91c1c; padding:12px; border-radius:12px; margin-bottom:16px; font-weight:700; font-size:14px">⚠️ Hàng đã lưu kho ${diffDays} ngày (Quá hạn)</div>` : ""}
       
       <div class="row" style="margin-bottom:20px">
-        <button onclick="setStatus('SHIPPED')">🚚 Giao hàng</button>
-        <button onclick="setStatus('HENBIN')" style="background:#fff7ed; color:#c2410c">🔄 Hoàn trả</button>
-        <button onclick="setInventory('IN_STOCK')" style="background:#eff6ff; color:#1d4ed8">📦 Vào kho</button>
+        ${isStaff ? `
+          <button onclick="setStatus('SHIPPED')">🚚 Giao hàng</button>
+          <button onclick="setStatus('HENBIN')" style="background:#fff7ed; color:#c2410c">🔄 Hoàn trả</button>
+          <button onclick="setInventory('IN_STOCK')" style="background:#eff6ff; color:#1d4ed8">📦 Vào kho</button>
+        ` : ""}
         <button onclick="togglePosted()" style="background:#fef9c3; color:#854d0e">🏷️ ${currentItem.is_posted ? 'Hủy đăng bán' : 'Đánh dấu đã đăng'}</button>
-        ${showDelete ? `<button onclick="delItem()" style="background:#fef2f2; color:#b91c1c; border:1px solid #fee2e2">Xoá cứng</button>` : ""}
+        ${isAdmin ? `<button onclick="delItem()" style="background:#fef2f2; color:#b91c1c; border:1px solid #fee2e2">Xoá cứng</button>` : ""}
       </div>
 
       <div class="detail-grid">

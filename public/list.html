@@ -9,10 +9,10 @@
 <body>
   <div class="no-print topbar">
     <div class="nav">
-      <a href="/create.html">Create</a>
-      <a href="/list.html" class="active">List</a>
-      <a href="/scan.html">Scan</a>
-      <a href="/inventory.html">Inventory</a>
+      <a href="/create.html" id="navCreate">Create</a>
+      <a href="/list.html" id="navList" class="active">List</a>
+      <a href="/scan.html" id="navScan">Scan</a>
+      <a href="/inventory.html" id="navInventory">Inventory</a>
       <a href="/settings.html" id="navSettings" style="display:none">Settings</a>
     </div>
     <button class="logout-btn" onclick="logout()">Logout</button>
@@ -119,15 +119,24 @@ async function logout(){
   location.href="/login.html";
 }
 
-async function checkAdmin() {
-  const r = await fetch("/api/me");
-  const j = await r.json();
+async function checkAuth() {
+  const r = await fetch("/api/me"); const j = await r.json();
   if (j.role === 'admin') {
-    const nav = document.getElementById("navSettings");
-    if (nav) nav.style.display = "inline-block";
+    document.getElementById("navSettings").style.display = "inline-block";
+  } else if (j.role === 'entry') {
+    document.getElementById("navCreate").style.display = "none";
+    document.getElementById("navScan").style.display = "none";
+    document.getElementById("navInventory").style.display = "none";
+    // Tự động đá ra khỏi trang nếu cố tình vào
+    if (location.pathname === "/create.html" || 
+        location.pathname === "/scan.html" || 
+        location.pathname === "/inventory.html" || 
+        location.pathname === "/settings.html") {
+      location.href = "/list.html";
+    }
   }
 }
-checkAdmin();
+checkAuth();
 
 function setTab(tab) {
   currentTab = tab;
