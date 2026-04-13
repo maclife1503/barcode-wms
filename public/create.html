@@ -199,9 +199,16 @@
         });
         const j = await r.json();
         if (r.ok) {
-          msg.textContent = `✅ Thành công! Đã cập nhật ${j.count} máy sang trạng thái Đã đăng.`;
+          let html = `✅ Thành công! Đã cập nhật ${j.count} máy.`;
+          if (j.notFound && j.notFound.length > 0) {
+            html += `<div style="margin-top:10px; padding:10px; background:#fff1f2; color:#be123c; border-radius:8px; font-size:13px; font-family:monospace">
+              <b>❌ Số Serial không tìm thấy (${j.notFound.length}):</b><br>
+              ${j.notFound.join(", ")}
+            </div>`;
+          }
+          msg.innerHTML = html;
           msg.style.color = "#16a34a";
-          input.value = ""; // Clear input on success
+          if (j.count > 0) input.value = ""; // Chỉ xóa nếu có ít nhất 1 cái thành công
         } else {
           msg.textContent = "❌ Lỗi: " + (j.error || "Thử lại sau");
           msg.style.color = "#ef4444";

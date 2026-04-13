@@ -870,6 +870,7 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
   try {
     const updated_at = nowISO();
     let totalUpdated = 0;
+    const notFound = [];
 
     for (const sn of serials) {
       // Tìm máy theo serial_clean hoặc serial_raw
@@ -877,6 +878,11 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
         sql: "SELECT id FROM items WHERE (serial_clean = ? OR serial_raw = ?) AND is_deleted = 0",
         args: [sn, sn]
       });
+
+      if (rows.length === 0) {
+        notFound.push(sn);
+        continue;
+      }
 
       for (const item of rows) {
         await db.execute({
@@ -892,7 +898,7 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
       }
     }
 
-    res.json({ ok: true, count: totalUpdated });
+    res.json({ ok: true, count: totalUpdated, notFound });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
