@@ -452,7 +452,10 @@ app.post("/api/inventory/add", requireAuth, async (req, res) => {
   const scanned_at = nowISO();
 
   try {
-    await db.execute({
+    const tx = await db.transaction("write");
+    
+    // 1. Thêm vào bảng công việc kiểm kê ngày hôm nay
+    await tx.execute({
       sql: `
       INSERT INTO inventory_work(date_key, token, item_id, package_id, name, mvd, serial, actor, scanned_at)
       VALUES(?,?,?,?,?,?,?,?,?)
@@ -470,12 +473,22 @@ app.post("/api/inventory/add", requireAuth, async (req, res) => {
       ]
     });
 
+    // 2. Cập nhật trạng thái trong bảng items chính
+    await tx.execute({
+      sql: `UPDATE items SET inventory_status = 'IN_STOCK', last_inventory_at = ?, updated_at = ? WHERE id = ?`,
+      args: [scanned_at, scanned_at, item.id]
+    });
+
+    // 3. Ghi nhật ký kiểm kê (Inventory Logs)
+    await tx.execute({
+      sql: `INSERT INTO inventory_logs(item_id, action, actor, created_at) VALUES(?,?,?,?)`,
+      args: [item.id, 'IN_STOCK', req.user, scanned_at]
+    });
+
+    await tx.commit();
     res.json({ ok: true });
   } catch (e) {
-    if (String(e.message || "").toLowerCase().includes("unique")) {
-      return res.status(409).json({ error: "Mã đã nhập trong bảng hôm nay." });
-    }
-    res.status(500).json({ error: "DB error" });
+    res.status(500).json({ error: e.message || "DB error" });
   }
 });
 
