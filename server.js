@@ -234,12 +234,12 @@ async function sendTelegramDocument(filePath, caption = "") {
 
   try {
     const url = `https://api.telegram.org/bot${token}/sendDocument`;
-    
+
     // Sử dụng Native FormData (Node 18+) để đảm bảo tương thích tốt nhất với native fetch
     const form = new globalThis.FormData();
     form.append("chat_id", chatId);
     form.append("caption", caption);
-    
+
     // Đọc file và đóng gói vào Blob
     const fileBuffer = fs.readFileSync(filePath);
     const blob = new globalThis.Blob([fileBuffer], { type: "text/csv" });
@@ -251,7 +251,7 @@ async function sendTelegramDocument(filePath, caption = "") {
       // Lưu ý: KHÔNG set Content-Type header thủ công khi dùng native FormData, 
       // fetch sẽ tự động set boundary cho mình.
     });
-    
+
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Telegram document send failed:", res.status, errBody);
@@ -285,7 +285,7 @@ async function sendTelegramPhoto(imageBuffer, caption = "", replyMarkup = null) 
       method: "POST",
       body: form
     });
-    
+
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Telegram photo send failed:", res.status, errBody);
@@ -342,9 +342,9 @@ async function generateLabelBuffer(item, qrBuffer) {
   // Left side text
   const leftX = pad;
   const textW = qrX - 5 - leftX;
-  
+
   ctx.fillStyle = "#000";
-  
+
   // MVD
   ctx.font = "bold 34px sans-serif";
   let y = pad + 38;
@@ -597,12 +597,12 @@ app.post("/api/external/create", async (req, res) => {
     const labelBuffer = await generateLabelBuffer(fields, qrBuffer);
 
     let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
-                    `📦 ID: <code>${package_id}</code>\n` +
-                    `🏷 Tên: <b>${escTg(fields.name)}</b>\n` +
-                    `🔢 Serial: <code>${fields.serial_clean}</code>\n` +
-                    `💎 Tình trạng: ${escTg(fields.condition)}\n` +
-                    `📅 Ngày tạo: ${fmtTimeLocal(t)}`;
-    
+      `📦 ID: <code>${package_id}</code>\n` +
+      `🏷 Tên: <b>${escTg(fields.name)}</b>\n` +
+      `🔢 Serial: <code>${fields.serial_clean}</code>\n` +
+      `💎 Tình trạng: ${escTg(fields.condition)}\n` +
+      `📅 Ngày tạo: ${fmtTimeLocal(t)}`;
+
     if (process.env.APP_URL) {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/scan.html?token=${token}">Xem chi tiết</a>`;
     }
@@ -620,8 +620,8 @@ app.post("/api/external/create", async (req, res) => {
     };
 
     const tgMsg = await sendTelegramPhoto(labelBuffer, caption, replyMarkup).catch(e => {
-        console.error("Shortcut Telegram notify failed:", e);
-        return null;
+      console.error("Shortcut Telegram notify failed:", e);
+      return null;
     });
 
     // Neu gui Telegram thanh cong, luu ID tin nhan de sau nay dong bo nut bam
@@ -663,15 +663,15 @@ app.post("/api/telegram/webhook", async (req, res) => {
         await fetch(answerUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            callback_query_id: cb.id, 
-            text: "❌ Bạn không có quyền thực hiện thao tác này!", 
-            show_alert: true 
+          body: JSON.stringify({
+            callback_query_id: cb.id,
+            text: "❌ Bạn không có quyền thực hiện thao tác này!",
+            show_alert: true
           })
         });
         return res.sendStatus(200);
       }
-      
+
       if (action === "meru") {
         const { rows } = await db.execute({ sql: "SELECT id, is_meru_logged FROM items WHERE id = ?", args: [itemId] });
         const item = rows[0];
@@ -680,14 +680,14 @@ app.post("/api/telegram/webhook", async (req, res) => {
           const next_val = item.is_meru_logged ? 0 : 1;
           await db.execute({ sql: "UPDATE items SET is_meru_logged = ?, updated_at = ? WHERE id = ?", args: [next_val, updated_at, itemId] });
           await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_meru_logged: next_val }), updated_at] });
-          
+
           await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Meru failed:", e));
 
           const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
           await fetch(answerUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               callback_query_id: cb.id,
               text: next_val ? "✅ Đã Log Meru!" : "🔄 Đã Hủy Log Meru",
               show_alert: false
@@ -704,18 +704,18 @@ app.post("/api/telegram/webhook", async (req, res) => {
           if (!item.is_posted) {
             await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
             await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
-            
+
             await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Posted failed:", e));
-            
+
             // Trả lời Telegram kèm thông báo
             const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
             await fetch(answerUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 callback_query_id: cb.id,
                 text: "✅ Đã đăng bán thành công!",
-                show_alert: false 
+                show_alert: false
               })
             });
           } else {
@@ -723,7 +723,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
             await fetch(answerUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 callback_query_id: cb.id,
                 text: "ℹ️ Sản phẩm này đã được đăng bán rồi.",
                 show_alert: false
@@ -803,7 +803,7 @@ function buildItemQuery(req) {
     );
     params.push(like, like, like, like);
   }
-  
+
   if (tab === 'stock') {
     where.push(`status IN ('READY_TO_SHIP', 'CREATED')`);
   } else if (tab === 'shipped') {
@@ -946,7 +946,7 @@ app.post("/api/inventory/add", requireAuth, requireStaff, async (req, res) => {
 
   try {
     const tx = await db.transaction("write");
-    
+
     // 1. Thêm vào bảng công việc kiểm kê ngày hôm nay
     await tx.execute({
       sql: `
@@ -1042,7 +1042,7 @@ app.post("/api/inventory/export", requireAuth, requireStaff, async (req, res) =>
 
   try {
     const tx = await db.transaction("write");
-    
+
     // 1. Lấy hàng đã quét hôm nay (kèm category)
     const { rows: scanned } = await tx.execute({
       sql: `
@@ -1220,7 +1220,7 @@ app.post("/api/items/:id/posted", requireAuth, async (req, res) => {
 
   const updated_at = nowISO();
   const next_val = is_posted ? 1 : 0;
-  
+
   await db.execute({
     sql: "UPDATE items SET is_posted = ?, updated_at = ? WHERE id = ?",
     args: [next_val, updated_at, id]
@@ -1251,7 +1251,7 @@ app.post("/api/items/:id/meru-logged", requireAuth, async (req, res) => {
 
   const updated_at = nowISO();
   const next_val = is_meru_logged ? 1 : 0;
-  
+
   await db.execute({
     sql: "UPDATE items SET is_meru_logged = ?, updated_at = ? WHERE id = ?",
     args: [next_val, updated_at, id]
@@ -1305,7 +1305,7 @@ app.post("/api/items/batch-posted", requireAuth, async (req, res) => {
             sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?",
             args: [updated_at, item.id]
           });
-          
+
           await db.execute({
             sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
             args: [item.id, req.user, JSON.stringify({ is_posted: 1, method: "batch" }), updated_at]
@@ -1420,13 +1420,13 @@ app.post("/api/telegram/test", requireAuth, requireSuperAdmin, async (req, res) 
   try {
     // 1. Thử gửi tin nhắn
     await sendTelegramMessage("🔔 <b>Hệ thống WMS:</b> Đang kiểm tra kết nối Bot...");
-    
+
     // 2. Thử tạo và gửi file mẫu
     const testFile = path.join(EXPORT_DIR, "test_connection.csv");
     fs.writeFileSync(testFile, "ID,Name,Status\n1,Test Item,Success", "utf8");
-    
+
     await sendTelegramDocument(testFile, "📄 Đây là tệp tin kiểm tra từ hệ thống WMS.");
-    
+
     res.json({ ok: true, message: "Đã gửi tin nhắn và file mẫu tới Telegram. Hãy kiểm tra điện thoại của bạn!" });
   } catch (e) {
     // Trả về nội dung lỗi chi tiết từ Telegram nếu có
@@ -1540,7 +1540,7 @@ app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, re
   try {
     const { rows: items } = await db.execute("SELECT id, name FROM items WHERE is_deleted = 0");
     const tx = await db.transaction("write");
-    
+
     for (const item of items) {
       const cat = detectCategory(item.name);
       await tx.execute({
@@ -1548,7 +1548,7 @@ app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, re
         args: [cat, item.id]
       });
     }
-    
+
     await tx.commit();
     res.json({ ok: true, count: items.length });
   } catch (e) {
@@ -1558,47 +1558,72 @@ app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, re
 
 // ====== Start server ======
 // Dong bo tat ca cac nut bam tren Telegram (Status, Posted, MeruLogged)
+// Dong bo tat ca cac nut bam tren Telegram (Status, Posted, MeruLogged)
 async function syncTelegramButtons(itemId) {
   try {
-    const { rows } = await db.execute({ 
-      sql: "SELECT id, status, is_posted, is_meru_logged, tg_chat_id, tg_msg_id FROM items WHERE id = ?", 
-      args: [itemId] 
+    const { rows } = await db.execute({
+      sql: "SELECT id, package_id, name, serial_clean, status, is_posted, is_meru_logged, tg_chat_id, tg_msg_id, created_at FROM items WHERE id = ?",
+      args: [itemId]
     });
     const item = rows[0];
     if (!item || !item.tg_chat_id || !item.tg_msg_id) return;
 
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    const url = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
     
+    // 1. Cap nhat Header dua tren tien do
+    let header = "⏳ [ CHỜ XỬ LÝ ]";
+    if (item.is_posted && item.is_meru_logged) {
+      header = "✅ [ HOÀN TẤT - 100% ]";
+    } else if (item.is_posted || item.is_meru_logged) {
+      header = "🟠 [ ĐANG XỬ LÝ - 50% ]";
+    }
+
+    let caption = `<b>${header}</b>\n\n` +
+                  `📦 ID: <code>${item.package_id}</code>\n` +
+                  `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
+                  `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+                  `📅 Ngày tạo: ${fmtTimeLocal(item.created_at)}`;
+    
+    if (process.env.APP_URL) {
+      caption += `\n\n🔗 <a href="${process.env.APP_URL}/item.html?id=${item.id}">Xem chi tiết trên Web</a>`;
+    }
+
+    // 2. Cap nhat Layout Nut Bam (Đỏ: Chưa xong / Xanh: Xong)
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `📍 Status: ${item.status}`, callback_data: "none" }
+          { text: `🚩 Trạng thái: ${item.status}`, callback_data: "none" }
         ],
         [
           item.is_posted 
-           ? { text: "✅ Posted", callback_data: `posted:${item.id}` } // Cho phep toggle lai
-           : { text: "📦 Post Meru", callback_data: `posted:${item.id}` },
+           ? { text: "🟢 ĐÃ ĐĂNG BÁN (POSTED)", callback_data: `posted:${item.id}` }
+           : { text: "🔴 BẤM ĐỂ ĐĂNG BÁN (POST)", callback_data: `posted:${item.id}` }
+        ],
+        [
           item.is_meru_logged
-           ? { text: "✅ Logged Meru", callback_data: `meru:${item.id}` }
-           : { text: "📝 Log Meru", callback_data: `meru:${item.id}` }
+           ? { text: "🟢 ĐÃ LOG HÀNG (LOG MERU)", callback_data: `meru:${item.id}` }
+           : { text: "🔴 BẤM ĐỂ LOG MERU (LOG)", callback_data: `meru:${item.id}` }
         ]
       ]
     };
 
+    // Cap nhat ca CAPTION va REPLY_MARKUP qua editMessageCaption
+    const url = `https://api.telegram.org/bot${token}/editMessageCaption`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: item.tg_chat_id,
         message_id: Number(item.tg_msg_id),
+        caption: caption,
+        parse_mode: "HTML",
         reply_markup: replyMarkup
       })
     });
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("Sync Telegram buttons failed:", res.status, err);
+      console.error("Sync Telegram buttons/caption failed:", res.status, err);
     }
   } catch (e) {
     console.error("syncTelegramButtons error:", e);
