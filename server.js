@@ -661,7 +661,6 @@ app.post("/api/telegram/webhook", async (req, res) => {
           if (!item.is_posted) {
             await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
             await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
-            await sendTelegramMessage(`✅ <b>Thành công!</b>\n📦 ID: <code>${item.package_id}</code> đã được đánh dấu <b>ĐÃ ĐĂNG BÁN</b>.`);
             
             // Cập nhật lại nút bấm thành trạng thái đã xong
             const editUrl = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
@@ -676,13 +675,34 @@ app.post("/api/telegram/webhook", async (req, res) => {
                 }
               })
             });
+            
+            // Trả lời Telegram kèm thông báo
+            const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+            await fetch(answerUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                callback_query_id: cb.id,
+                text: "✅ Đã đăng bán thành công!",
+                show_alert: false // Hiển thị thông báo nhỏ phía trên
+              })
+            });
           } else {
-            await sendTelegramMessage(`ℹ️ Sản phẩm <code>${item.package_id}</code> đã được đăng bán từ trước.`);
+            const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+            await fetch(answerUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                callback_query_id: cb.id,
+                text: "ℹ️ Sản phẩm này đã được đăng bán rồi.",
+                show_alert: false
+              })
+            });
           }
         }
       }
 
-      // Luôn trả lời Telegram để tắt biểu tượng đang tải (spinner) trên nút bấm
+      // Luôn trả lời Telegram nếu chưa trả lời ở trên (để tắt spinner)
       const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
       await fetch(answerUrl, {
         method: "POST",
