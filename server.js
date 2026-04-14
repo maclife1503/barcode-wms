@@ -1558,27 +1558,19 @@ app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, re
 
 // ====== Start server ======
 // Dong bo tat ca cac nut bam tren Telegram (Status, Posted, MeruLogged)
-// Dong bo tat ca cac nut bam tren Telegram (Status, Posted, MeruLogged)
 async function syncTelegramButtons(itemId) {
   try {
     const { rows } = await db.execute({
-      sql: "SELECT id, package_id, name, serial_clean, status, is_posted, is_meru_logged, tg_chat_id, tg_msg_id, created_at FROM items WHERE id = ?",
+      sql: "SELECT id, package_id, name, serial_clean, condition, status, is_posted, is_meru_logged, tg_chat_id, tg_msg_id, created_at FROM items WHERE id = ?",
       args: [itemId]
     });
     const item = rows[0];
     if (!item || !item.tg_chat_id || !item.tg_msg_id) return;
 
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    
-    // 1. Cap nhat Header dua tren tien do
-    let header = "⏳ [ CHỜ XỬ LÝ ]";
-    if (item.is_posted && item.is_meru_logged) {
-      header = "✅ [ HOÀN TẤT - 100% ]";
-    } else if (item.is_posted || item.is_meru_logged) {
-      header = "🟠 [ ĐANG XỬ LÝ - 50% ]";
-    }
 
-    let caption = `<b>${header}</b>\n\n` +
+    // 1. Quay lai Caption don gian
+    let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
                   `📦 ID: <code>${item.package_id}</code>\n` +
                   `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
                   `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
@@ -1588,28 +1580,25 @@ async function syncTelegramButtons(itemId) {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/item.html?id=${item.id}">Xem chi tiết trên Web</a>`;
     }
 
-    // 2. Cap nhat Layout Nut Bam (Đỏ: Chưa xong / Xanh: Xong)
+    // 2. Nut bam Do/Xanh don gian
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `🚩 Trạng thái: ${item.status}`, callback_data: "none" }
+          { text: `📍 Trạng thái: ${item.status}`, callback_data: "none" }
         ],
         [
           item.is_posted 
-           ? { text: "🟢 ĐÃ ĐĂNG BÁN (POSTED)", callback_data: `posted:${item.id}` }
-           : { text: "🔴 BẤM ĐỂ ĐĂNG BÁN (POST)", callback_data: `posted:${item.id}` }
-        ],
-        [
+           ? { text: "🟢 ĐÃ ĐĂNG BÁN", callback_data: `posted:${item.id}` }
+           : { text: "🔴 BẤM ĐỂ ĐĂNG BÁN", callback_data: `posted:${item.id}` },
           item.is_meru_logged
-           ? { text: "🟢 ĐÃ LOG HÀNG (LOG MERU)", callback_data: `meru:${item.id}` }
-           : { text: "🔴 BẤM ĐỂ LOG MERU (LOG)", callback_data: `meru:${item.id}` }
+           ? { text: "🟢 ĐÃ LOG MERU", callback_data: `meru:${item.id}` }
+           : { text: "🔴 BẤM ĐỂ LOG MERU", callback_data: `meru:${item.id}` }
         ]
       ]
     };
 
-    // Cap nhat ca CAPTION va REPLY_MARKUP qua editMessageCaption
     const url = `https://api.telegram.org/bot${token}/editMessageCaption`;
-    const res = await fetch(url, {
+    await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1621,10 +1610,6 @@ async function syncTelegramButtons(itemId) {
       })
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("Sync Telegram buttons/caption failed:", res.status, err);
-    }
   } catch (e) {
     console.error("syncTelegramButtons error:", e);
   }
