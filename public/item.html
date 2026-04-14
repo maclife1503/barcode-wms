@@ -212,7 +212,14 @@ async function loadItem(){
     document.getElementById("navInventory").style.display = "none";
   }
   
-  const diffDays = Math.ceil(Math.abs(new Date() - new Date(it.created_at)) / 86400000);
+  let diffDays = 0;
+  if (it.status === 'HENBIN') {
+    diffDays = 0;
+  } else if (it.status === 'SHIPPED' && it.shipped_at) {
+    diffDays = Math.ceil(Math.abs(new Date(it.shipped_at) - new Date(it.created_at)) / 86400000);
+  } else {
+    diffDays = Math.ceil(Math.abs(new Date() - new Date(it.created_at)) / 86400000);
+  }
   const isStale = diffDays > 15 && (it.status==='READY_TO_SHIP'||it.status==='CREATED');
 
   document.getElementById("box").innerHTML = `

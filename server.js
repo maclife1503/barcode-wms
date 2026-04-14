@@ -940,6 +940,9 @@ app.post("/api/inventory/add", requireAuth, requireStaff, async (req, res) => {
   if (item.is_deleted === 1 || item.status === "DELETED") {
     return res.status(400).json({ error: "Item is deleted" });
   }
+  if (item.status === "SHIPPED") {
+    return res.status(400).json({ error: "Hàng đã giao, không thể kiểm kho lại." });
+  }
 
   const date_key = yyyymmddLocal();
   const scanned_at = nowISO();
@@ -1154,7 +1157,20 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   const from_status = item.status;
   const updated_at = nowISO();
 
-  await db.execute({ sql: "UPDATE items SET status = ?, updated_at = ? WHERE id = ?", args: [to_status, updated_at, id] });
+  let inventory_status = item.inventory_status;
+  let shipped_at = item.shipped_at;
+
+  if (to_status === "SHIPPED") {
+    inventory_status = "NOT_IN_STOCK";
+    shipped_at = updated_at;
+  } else if (to_status === "HENBIN") {
+    inventory_status = "NOT_IN_STOCK";
+  }
+
+  await db.execute({ 
+    sql: "UPDATE items SET status = ?, inventory_status = ?, shipped_at = ?, updated_at = ? WHERE id = ?", 
+    args: [to_status, inventory_status, shipped_at, updated_at, id] 
+  });
 
   // CHỈ ghi log nếu trạng thái thay đổi
   if (from_status !== to_status) {

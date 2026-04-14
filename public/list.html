@@ -274,7 +274,14 @@ function render() {
             </thead>
             <tbody>
               ${items.map(r=>{
-                const diff = Math.ceil((new Date() - new Date(r.created_at)) / (86400000));
+                let diff = 0;
+                if (r.status === 'HENBIN') {
+                  diff = 0;
+                } else if (r.status === 'SHIPPED' && r.shipped_at) {
+                  diff = Math.ceil((new Date(r.shipped_at) - new Date(r.created_at)) / (86400000));
+                } else {
+                  diff = Math.ceil((new Date() - new Date(r.created_at)) / (86400000));
+                }
                 const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
                 return `
                 <tr style="${isStale ? 'background:#fff1f2' : ''}">
