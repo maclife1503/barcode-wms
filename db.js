@@ -38,7 +38,10 @@ CREATE TABLE IF NOT EXISTS items (
   is_deleted INTEGER NOT NULL DEFAULT 0,
   is_posted INTEGER NOT NULL DEFAULT 0,
   deleted_at TEXT,
-  deleted_by TEXT
+  deleted_by TEXT,
+
+  tg_chat_id TEXT,
+  tg_msg_id TEXT
 
 );
 
@@ -95,6 +98,12 @@ CREATE TABLE IF NOT EXISTS inventory_exports (
   } catch(e) { /* ignore */ }
   try {
     await db.execute("ALTER TABLE items ADD COLUMN is_posted INTEGER NOT NULL DEFAULT 0");
+  } catch(e) { /* ignore */ }
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN tg_chat_id TEXT");
+  } catch(e) { /* ignore */ }
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN tg_msg_id TEXT");
   } catch(e) { /* ignore */ }
 
   // Migration: Phân loại hàng loạt cho các máy cũ chưa có category

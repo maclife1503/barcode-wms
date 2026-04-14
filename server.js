@@ -289,9 +289,13 @@ async function sendTelegramPhoto(imageBuffer, caption = "", replyMarkup = null) 
     if (!res.ok) {
       const errBody = await res.text();
       console.error("Telegram photo send failed:", res.status, errBody);
+      return null;
     }
+    const data = await res.json();
+    return data.result; // Tra ve thong tin tin nhan (co message_id)
   } catch (e) {
     console.error("sendTelegramPhoto Error:", e.message);
+    return null;
   }
 }
 
@@ -611,7 +615,18 @@ app.post("/api/external/create", async (req, res) => {
       ]
     };
 
-    sendTelegramPhoto(labelBuffer, caption, replyMarkup).catch(e => console.error("Shortcut Telegram notify failed:", e));
+    const tgMsg = await sendTelegramPhoto(labelBuffer, caption, replyMarkup).catch(e => {
+        console.error("Shortcut Telegram notify failed:", e);
+        return null;
+    });
+
+    // Neu gui Telegram thanh cong, luu ID tin nhan de sau nay dong bo nut bam
+    if (tgMsg) {
+      await db.execute({
+        sql: "UPDATE items SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
+        args: [String(tgMsg.chat.id), String(tgMsg.message_id), newItem.id]
+      });
+    }
 
     res.json({ ok: true, package_id, token });
   } catch (e) {
@@ -1198,6 +1213,9 @@ app.post("/api/items/:id/posted", requireAuth, async (req, res) => {
       sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
       args: [id, req.user, JSON.stringify({ is_posted: next_val }), updated_at]
     });
+
+    // Dong bo nut bam Telegram neu co
+    syncTelegramPostedButton(id, next_val).catch(e => console.error("Sync TG failed:", e));
   }
 
   res.json({ ok: true });
@@ -1490,6 +1508,48 @@ app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, re
 });
 
 // ====== Start server ======
+// Dong bo trang thai nut bam tren Telegram (Post vs ✅ Posted)
+async function syncTelegramPostedButton(itemId, is_posted) {
+  try {
+    const { rows } = await db.execute({ 
+      sql: "SELECT id, tg_chat_id, tg_msg_id FROM items WHERE id = ?", 
+      args: [itemId] 
+    });
+    const item = rows[0];
+    if (!item || !item.tg_chat_id || !item.tg_msg_id) return;
+
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const url = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
+    
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          is_posted 
+           ? { text: "✅ Đã đăng bán", callback_data: "done" }
+           : { text: "🏷️ Đánh dấu Đã đăng bán", callback_data: `posted:${item.id}` }
+        ]
+      ]
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: item.tg_chat_id,
+        message_id: Number(item.tg_msg_id),
+        reply_markup: replyMarkup
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("Sync Telegram button failed:", res.status, err);
+    }
+  } catch (e) {
+    console.error("syncTelegramPostedButton error:", e);
+  }
+}
+
 app.listen(3000, "0.0.0.0", () => {
   console.log("WMS running:");
   console.log(" - http://localhost:3000/login.html");
