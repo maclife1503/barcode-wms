@@ -644,11 +644,34 @@ app.post("/api/telegram/webhook", async (req, res) => {
             await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
             await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
             await sendTelegramMessage(`✅ <b>Thành công!</b>\n📦 ID: <code>${item.package_id}</code> đã được đánh dấu <b>ĐÃ ĐĂNG BÁN</b>.`);
+            
+            // Cập nhật lại nút bấm thành trạng thái đã xong
+            const editUrl = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
+            await fetch(editUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: chatId,
+                message_id: cb.message.message_id,
+                reply_markup: {
+                  inline_keyboard: [[{ text: "✅ Đã đăng bán", callback_data: "done" }]]
+                }
+              })
+            });
           } else {
             await sendTelegramMessage(`ℹ️ Sản phẩm <code>${item.package_id}</code> đã được đăng bán từ trước.`);
           }
         }
       }
+
+      // Luôn trả lời Telegram để tắt biểu tượng đang tải (spinner) trên nút bấm
+      const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+      await fetch(answerUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callback_query_id: cb.id })
+      });
+
     } catch (e) {
       console.error("Telegram callback error:", e);
     }
