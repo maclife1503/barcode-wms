@@ -610,7 +610,11 @@ app.post("/api/external/create", async (req, res) => {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: "🏷️ Đánh dấu Đã đăng bán", callback_data: `posted:${newItem.id}` }
+          { text: `📍 Status: READY_TO_SHIP`, callback_data: "none" }
+        ],
+        [
+          { text: "📦 Post Meru", callback_data: `posted:${newItem.id}` },
+          { text: "📝 Log Meru", callback_data: `meru:${newItem.id}` }
         ]
       ]
     };
@@ -667,9 +671,33 @@ app.post("/api/telegram/webhook", async (req, res) => {
         });
         return res.sendStatus(200);
       }
+      
+      if (action === "meru") {
+        const { rows } = await db.execute({ sql: "SELECT id, is_meru_logged FROM items WHERE id = ?", args: [itemId] });
+        const item = rows[0];
+        if (item) {
+          const updated_at = nowISO();
+          const next_val = item.is_meru_logged ? 0 : 1;
+          await db.execute({ sql: "UPDATE items SET is_meru_logged = ?, updated_at = ? WHERE id = ?", args: [next_val, updated_at, itemId] });
+          await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_meru_logged: next_val }), updated_at] });
+          
+          await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Meru failed:", e));
+
+          const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+          await fetch(answerUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              callback_query_id: cb.id,
+              text: next_val ? "✅ Đã Log Meru!" : "🔄 Đã Hủy Log Meru",
+              show_alert: false
+            })
+          });
+        }
+      }
 
       if (action === "posted") {
-        const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
+        const { rows } = await db.execute({ sql: "SELECT id, package_id, is_posted FROM items WHERE id = ?", args: [itemId] });
         const item = rows[0];
         if (item) {
           const updated_at = nowISO();
@@ -677,19 +705,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
             await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
             await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
             
-            // Cập nhật lại nút bấm thành trạng thái đã xong
-            const editUrl = `https://api.telegram.org/bot${token}/editMessageReplyMarkup`;
-            await fetch(editUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: chatId,
-                message_id: cb.message.message_id,
-                reply_markup: {
-                  inline_keyboard: [[{ text: "✅ Đã đăng bán", callback_data: "done" }]]
-                }
-              })
-            });
+            await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Posted failed:", e));
             
             // Trả lời Telegram kèm thông báo
             const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
@@ -699,7 +715,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
               body: JSON.stringify({ 
                 callback_query_id: cb.id,
                 text: "✅ Đã đăng bán thành công!",
-                show_alert: false // Hiển thị thông báo nhỏ phía trên
+                show_alert: false 
               })
             });
           } else {
@@ -1149,6 +1165,9 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
     `,
       args: [id, from_status, to_status, req.user, updated_at]
     });
+
+    // Dong bo Telegram
+    syncTelegramButtons(id).catch(e => console.error("Sync TG status failed:", e));
   }
 
   res.json({ ok: true });
@@ -1215,7 +1234,37 @@ app.post("/api/items/:id/posted", requireAuth, async (req, res) => {
     });
 
     // Dong bo nut bam Telegram neu co
-    syncTelegramPostedButton(id, next_val).catch(e => console.error("Sync TG failed:", e));
+    syncTelegramButtons(id).catch(e => console.error("Sync TG Posted failed:", e));
+  }
+
+  res.json({ ok: true });
+});
+
+// ====== Toggle Meru Logged Status ======
+app.post("/api/items/:id/meru-logged", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { is_meru_logged } = req.body;
+
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
+  const item = rows[0];
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const updated_at = nowISO();
+  const next_val = is_meru_logged ? 1 : 0;
+  
+  await db.execute({
+    sql: "UPDATE items SET is_meru_logged = ?, updated_at = ? WHERE id = ?",
+    args: [next_val, updated_at, id]
+  });
+
+  if (item.is_meru_logged !== next_val) {
+    await db.execute({
+      sql: `INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)`,
+      args: [id, req.user, JSON.stringify({ is_meru_logged: next_val }), updated_at]
+    });
+
+    // Dong bo nut bam Telegram neu co
+    syncTelegramButtons(id).catch(e => console.error("Sync TG Meru failed:", e));
   }
 
   res.json({ ok: true });
@@ -1508,11 +1557,11 @@ app.post("/api/categories/reclassify", requireAuth, requireAdmin, async (req, re
 });
 
 // ====== Start server ======
-// Dong bo trang thai nut bam tren Telegram (Post vs ✅ Posted)
-async function syncTelegramPostedButton(itemId, is_posted) {
+// Dong bo tat ca cac nut bam tren Telegram (Status, Posted, MeruLogged)
+async function syncTelegramButtons(itemId) {
   try {
     const { rows } = await db.execute({ 
-      sql: "SELECT id, tg_chat_id, tg_msg_id FROM items WHERE id = ?", 
+      sql: "SELECT id, status, is_posted, is_meru_logged, tg_chat_id, tg_msg_id FROM items WHERE id = ?", 
       args: [itemId] 
     });
     const item = rows[0];
@@ -1524,9 +1573,15 @@ async function syncTelegramPostedButton(itemId, is_posted) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          is_posted 
-           ? { text: "✅ Đã đăng bán", callback_data: "done" }
-           : { text: "🏷️ Đánh dấu Đã đăng bán", callback_data: `posted:${item.id}` }
+          { text: `📍 Status: ${item.status}`, callback_data: "none" }
+        ],
+        [
+          item.is_posted 
+           ? { text: "✅ Posted", callback_data: `posted:${item.id}` } // Cho phep toggle lai
+           : { text: "📦 Post Meru", callback_data: `posted:${item.id}` },
+          item.is_meru_logged
+           ? { text: "✅ Logged Meru", callback_data: `meru:${item.id}` }
+           : { text: "📝 Log Meru", callback_data: `meru:${item.id}` }
         ]
       ]
     };
@@ -1543,10 +1598,10 @@ async function syncTelegramPostedButton(itemId, is_posted) {
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("Sync Telegram button failed:", res.status, err);
+      console.error("Sync Telegram buttons failed:", res.status, err);
     }
   } catch (e) {
-    console.error("syncTelegramPostedButton error:", e);
+    console.error("syncTelegramButtons error:", e);
   }
 }
 

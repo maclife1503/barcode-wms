@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS items (
   deleted_by TEXT,
 
   tg_chat_id TEXT,
-  tg_msg_id TEXT
+  tg_msg_id TEXT,
+  is_meru_logged INTEGER NOT NULL DEFAULT 0
 
 );
 
@@ -104,6 +105,9 @@ CREATE TABLE IF NOT EXISTS inventory_exports (
   } catch(e) { /* ignore */ }
   try {
     await db.execute("ALTER TABLE items ADD COLUMN tg_msg_id TEXT");
+  } catch(e) { /* ignore */ }
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN is_meru_logged INTEGER NOT NULL DEFAULT 0");
   } catch(e) { /* ignore */ }
 
   // Migration: Phân loại hàng loạt cho các máy cũ chưa có category
