@@ -153,13 +153,20 @@ async function setMode(m){
 async function startScan(){
   if(!html5QrCode) html5QrCode = new Html5Qrcode("reader");
   if(isScanning) return;
-  const devices = await Html5Qrcode.getCameras().catch(()=>[]);
-  if(!devices.length){ alert("Không tìm thấy camera"); return; }
-  const cam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[0];
+  
   isScanning = true;
-  await html5QrCode.start(cam.id, {
-    fps: 20, qrbox: (vw, vh) => { const s = Math.floor(Math.min(vw, vh) * 0.75); return { width: s, height: s }; }
-  }, onScanSuccess);
+  await html5QrCode.start(
+    { facingMode: "environment" }, 
+    {
+      fps: 20, 
+      qrbox: (vw, vh) => { const s = Math.floor(Math.min(vw, vh) * 0.75); return { width: s, height: s }; }
+    }, 
+    onScanSuccess
+  ).catch(err => {
+    isScanning = false;
+    console.error("Camera error:", err);
+    alert("Không tìm thấy camera sau hoặc lỗi quyền truy cập.");
+  });
 }
 
 async function onScanSuccess(decodedText) {
