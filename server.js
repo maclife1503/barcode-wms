@@ -9,6 +9,7 @@ const QRCode = require("qrcode");
 const crypto = require("crypto");
 const FormData = require("form-data");
 const { createCanvas, loadImage } = require("canvas");
+const jsQR = require("jsqr");
 const db = require("./db");
 
 const app = express();
@@ -604,6 +605,166 @@ app.post("/api/external/create", async (req, res) => {
     console.error("Shortcut API failed:", e);
     res.status(500).json({ error: e.message || "Shortcut processing failed" });
   }
+});
+
+// ====== Telegram Webhook Handler ======
+app.post("/api/telegram/webhook", async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const authorizedChatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!req.body) return res.sendStatus(200);
+
+  // 1. Handle Button Clicks (Callback Queries)
+  if (req.body.callback_query) {
+    const cb = req.body.callback_query;
+    const chatId = String(cb.message.chat.id);
+    if (chatId !== String(authorizedChatId)) return res.sendStatus(200);
+
+    const [action, itemId] = cb.data.split(":");
+    try {
+      const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
+      const item = rows[0];
+      if (!item) {
+        await sendTelegramMessage(`❌ Lỗi: Không tìm thấy sản phẩm ID ${itemId}`);
+        return res.sendStatus(200);
+      }
+
+      const updated_at = nowISO();
+      let statusText = "";
+
+      if (action === "shipped") {
+        await db.execute({ sql: "UPDATE items SET status = 'SHIPPED', updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
+        await db.execute({ sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)", args: [itemId, item.status, 'SHIPPED', 'TelegramBot', updated_at] });
+        statusText = "🚚 GIAO HÀNG (SHIPPED)";
+      } else if (action === "henbin") {
+        await db.execute({ sql: "UPDATE items SET status = 'HENBIN', updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
+        await db.execute({ sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)", args: [itemId, item.status, 'HENBIN', 'TelegramBot', updated_at] });
+        statusText = "🔄 HOÀN TRẢ (HENBIN)";
+      } else if (action === "posted") {
+        await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
+        await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
+        statusText = "🏷️ ĐÃ ĐĂNG BÁN (POSTED)";
+      }
+
+      await sendTelegramMessage(`✅ <b>Thành công!</b>\n📦 ID: <code>${item.package_id}</code>\n💎 Trạng thái mới: <b>${statusText}</b>`);
+    } catch (e) {
+      console.error("Telegram callback error:", e);
+      await sendTelegramMessage(`❌ Lỗi xử lý: ${e.message}`);
+    }
+    return res.sendStatus(200);
+  }
+
+  // 2. Handle Messages (Text or Photo)
+  const msg = req.body.message;
+  if (!msg || !msg.chat) return res.sendStatus(200);
+  const chatId = String(msg.chat.id);
+  if (chatId !== String(authorizedChatId)) return res.sendStatus(200);
+
+  // A. Handle Serial as Text
+  if (msg.text) {
+    const text = msg.text.trim();
+    const serial_clean = (text.match(/[A-Z0-9]{6,}/i)?.[0] ?? "").trim();
+
+    if (serial_clean) {
+      try {
+        const { rows } = await db.execute({
+          sql: "SELECT * FROM items WHERE (serial_clean = ? OR serial_raw = ?) AND is_deleted = 0 LIMIT 1",
+          args: [serial_clean, text]
+        });
+        const item = rows[0];
+
+        if (item) {
+          const updated_at = nowISO();
+          if (!item.is_posted) {
+            await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, item.id] });
+            await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [item.id, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
+            await sendTelegramMessage(`✅ <b>Đã cập nhật Đã đăng:</b>\n📦 ID: <code>${item.package_id}</code>\n🏷️ Tên: ${escTg(item.name)}\n🔢 Serial: <code>${item.serial_clean}</code>`);
+          } else {
+            await sendTelegramMessage(`ℹ️ SP <code>${item.package_id}</code> (${item.serial_clean}) đã được đánh dấu Đã đăng từ trước.`);
+          }
+        } else {
+          if (text.length >= 6) await sendTelegramMessage(`❌ Không tìm thấy sản phẩm nào có Serial: <code>${text}</code>`);
+        }
+      } catch (e) {
+        console.error("Telegram text processing failed:", e);
+      }
+    }
+  }
+
+  // B. Handle Photos (QR Scanning)
+  if (msg.photo && msg.photo.length > 0) {
+    try {
+      const photo = msg.photo[msg.photo.length - 1]; // pixel cao nhat
+      const fileId = photo.file_id;
+
+      // Lay URL file tu Telegram
+      const getFileUrl = `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`;
+      const fileRes = await fetch(getFileUrl);
+      const fileData = await fileRes.json();
+      if (!fileData.ok) throw new Error("Telegram getFile failed");
+
+      const filePath = fileData.result.file_path;
+      const downloadUrl = `https://api.telegram.org/file/bot${token}/${filePath}`;
+      
+      const imgBuffer = await (await fetch(downloadUrl)).arrayBuffer();
+      const image = await loadImage(Buffer.from(imgBuffer));
+      
+      const canvas = createCanvas(image.width, image.height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (code && code.data) {
+        const tokenVal = code.data.trim();
+        const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ? AND is_deleted = 0", args: [tokenVal] });
+        const item = rows[0];
+
+        if (item) {
+          const caption = `🎯 <b>NHẬN DIỆN SẢN PHẨM</b>\n\n` +
+                          `📦 ID: <code>${item.package_id}</code>\n` +
+                          `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
+                          `🔢 Serial: <code>${item.serial_clean}</code>\n` +
+                          `💎 Trạng thái: <b>${item.status}</b>\n\n` +
+                          `👇 <b>BẠN MUỐN LÀM GÌ?</b>`;
+          
+          const replyMarkup = JSON.stringify({
+            inline_keyboard: [
+              [
+                { text: "🚚 Giao hàng", callback_data: `shipped:${item.id}` },
+                { text: "🔄 Hoàn trả", callback_data: `henbin:${item.id}` }
+              ],
+              [
+                { text: "🏷️ Đánh dấu Đã đăng", callback_data: `posted:${item.id}` }
+              ]
+            ]
+          });
+
+          const sendUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+          await fetch(sendUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: caption,
+              parse_mode: "HTML",
+              reply_markup: JSON.parse(replyMarkup)
+            })
+          });
+        } else {
+          await sendTelegramMessage("❌ Mã QR hợp lệ nhưng không tìm thấy sản phẩm trong hệ thống.");
+        }
+      } else {
+        await sendTelegramMessage("🔍 Không tìm thấy mã QR nào trong ảnh này. Hãy thử chụp rõ hơn.");
+      }
+    } catch (e) {
+      console.error("Telegram photo processing failed:", e);
+      await sendTelegramMessage(`❌ Lỗi xử lý ảnh: ${e.message}`);
+    }
+  }
+
+  res.sendStatus(200);
 });
 
 function buildItemQuery(req) {
