@@ -635,6 +635,24 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
     const [action, itemId] = cb.data.split(":");
     try {
+      // Kiểm tra quyền hạn người dùng (Whitelist)
+      const authorizedUserIds = (process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
+      const userId = String(cb.from.id);
+
+      if (authorizedUserIds.length > 0 && !authorizedUserIds.includes(userId)) {
+        const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+        await fetch(answerUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            callback_query_id: cb.id, 
+            text: "❌ Bạn không có quyền thực hiện thao tác này!", 
+            show_alert: true 
+          })
+        });
+        return res.sendStatus(200);
+      }
+
       if (action === "posted") {
         const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
         const item = rows[0];
