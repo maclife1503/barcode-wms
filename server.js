@@ -263,7 +263,7 @@ async function sendTelegramDocument(filePath, caption = "") {
   }
 }
 
-async function sendTelegramPhoto(imageBuffer, caption = "") {
+async function sendTelegramPhoto(imageBuffer, caption = "", replyMarkup = null) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = String(process.env.TELEGRAM_CHAT_ID);
   if (!token || !chatId) return;
@@ -274,6 +274,9 @@ async function sendTelegramPhoto(imageBuffer, caption = "") {
     form.append("chat_id", chatId);
     form.append("caption", caption);
     form.append("parse_mode", "HTML");
+    if (replyMarkup) {
+      form.append("reply_markup", JSON.stringify(replyMarkup));
+    }
 
     const blob = new globalThis.Blob([imageBuffer], { type: "image/png" });
     form.append("photo", blob, "qr_code.png");
@@ -582,7 +585,10 @@ app.post("/api/external/create", async (req, res) => {
       ]
     });
 
-    // Notify Telegram with Formatted Label
+    const { rows: itemRows } = await db.execute({ sql: "SELECT id FROM items WHERE token = ?", args: [token] });
+    const newItem = itemRows[0];
+
+    // Notify Telegram with Formatted Label + Button
     const qrBuffer = await QRCode.toBuffer(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
     const labelBuffer = await generateLabelBuffer(fields, qrBuffer);
 
@@ -597,7 +603,15 @@ app.post("/api/external/create", async (req, res) => {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/scan.html?token=${token}">Xem chi tiết</a>`;
     }
 
-    sendTelegramPhoto(labelBuffer, caption).catch(e => console.error("Shortcut Telegram notify failed:", e));
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          { text: "🏷️ Đánh dấu Đã đăng bán", callback_data: `posted:${newItem.id}` }
+        ]
+      ]
+    };
+
+    sendTelegramPhoto(labelBuffer, caption, replyMarkup).catch(e => console.error("Shortcut Telegram notify failed:", e));
 
     res.json({ ok: true, package_id, token });
   } catch (e) {
@@ -612,6 +626,34 @@ app.post("/api/telegram/webhook", async (req, res) => {
   const authorizedChatId = process.env.TELEGRAM_CHAT_ID;
 
   if (!req.body) return res.sendStatus(200);
+
+  // 1. Handle Button Clicks (Callback Queries)
+  if (req.body.callback_query) {
+    const cb = req.body.callback_query;
+    const chatId = String(cb.message.chat.id);
+    if (chatId !== String(authorizedChatId)) return res.sendStatus(200);
+
+    const [action, itemId] = cb.data.split(":");
+    try {
+      if (action === "posted") {
+        const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
+        const item = rows[0];
+        if (item) {
+          const updated_at = nowISO();
+          if (!item.is_posted) {
+            await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
+            await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
+            await sendTelegramMessage(`✅ <b>Thành công!</b>\n📦 ID: <code>${item.package_id}</code> đã được đánh dấu <b>ĐÃ ĐĂNG BÁN</b>.`);
+          } else {
+            await sendTelegramMessage(`ℹ️ Sản phẩm <code>${item.package_id}</code> đã được đăng bán từ trước.`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Telegram callback error:", e);
+    }
+    return res.sendStatus(200);
+  }
 
   const msg = req.body.message;
   if (!msg || !msg.chat) return res.sendStatus(200);
