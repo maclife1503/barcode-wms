@@ -613,8 +613,8 @@ app.post("/api/external/create", async (req, res) => {
           { text: `📍 Status: READY_TO_SHIP`, callback_data: "none" }
         ],
         [
-          { text: "📦 Post Meru", callback_data: `posted:${newItem.id}` },
-          { text: "📝 Log Meru", callback_data: `meru:${newItem.id}` }
+          { text: "🔴 Post Meru", callback_data: `posted:${newItem.id}` },
+          { text: "🔴 Log Meru", callback_data: `meru:${newItem.id}` }
         ]
       ]
     };
@@ -1571,11 +1571,11 @@ async function syncTelegramButtons(itemId) {
 
     // 1. Quay lai Caption don gian
     let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
-                  `📦 ID: <code>${item.package_id}</code>\n` +
-                  `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
-                  `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
-                  `📅 Ngày tạo: ${fmtTimeLocal(item.created_at)}`;
-    
+      `📦 ID: <code>${item.package_id}</code>\n` +
+      `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
+      `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+      `📅 Ngày tạo: ${fmtTimeLocal(item.created_at)}`;
+
     if (process.env.APP_URL) {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/item.html?id=${item.id}">Xem chi tiết trên Web</a>`;
     }
@@ -1588,11 +1588,11 @@ async function syncTelegramButtons(itemId) {
         ],
         [
           item.is_posted 
-           ? { text: "🟢 ĐÃ ĐĂNG BÁN", callback_data: `posted:${item.id}` }
-           : { text: "🔴 BẤM ĐỂ ĐĂNG BÁN", callback_data: `posted:${item.id}` },
+             ? { text: "🟢 Posted", callback_data: `posted:${item.id}` } 
+             : { text: "🔴 Post Meru", callback_data: `posted:${item.id}` },
           item.is_meru_logged
-           ? { text: "🟢 ĐÃ LOG MERU", callback_data: `meru:${item.id}` }
-           : { text: "🔴 BẤM ĐỂ LOG MERU", callback_data: `meru:${item.id}` }
+             ? { text: "🟢 Logged", callback_data: `meru:${item.id}` }
+             : { text: "🔴 Log Meru", callback_data: `meru:${item.id}` }
         ]
       ]
     };
