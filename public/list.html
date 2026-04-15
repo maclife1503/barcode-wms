@@ -23,50 +23,51 @@
     <div id="filterPath" style="font-size:14px; color:var(--primary); font-weight:600"></div>
   </div>
 
-  <!-- Hệ thống Tabs -->
+  <!-- Tabs -->
   <div class="row no-print" style="margin-bottom:16px; gap:8px">
-    <button class="tab-btn" id="tab-all" onclick="setTab('all')">Tất cả</button>
-    <button class="tab-btn active" id="tab-stock" onclick="setTab('stock')">Stock (Tồn kho)</button>
-    <button class="tab-btn" id="tab-shipped" onclick="setTab('shipped')">Shipped (Đã giao)</button>
-    <button class="tab-btn" id="tab-return" onclick="setTab('return')">Return (Hoàn trả)</button>
-    <button class="tab-btn" id="tab-not_posted" onclick="setTab('not_posted')">Chưa post 🏷️</button>
+    <button class="tab-btn" id="tab-all" onclick="setTab('all')">All</button>
+    <button class="tab-btn active" id="tab-stock" onclick="setTab('stock')">Stock</button>
+    <button class="tab-btn" id="tab-shipped" onclick="setTab('shipped')">Shipped</button>
+    <button class="tab-btn" id="tab-return" onclick="setTab('return')">Return</button>
+    <button class="tab-btn" id="tab-not_posted" onclick="setTab('not_posted')">Not Posted 🏷️</button>
   </div>
 
   <div class="card no-print">
     <div class="row" style="gap:16px">
       <div style="flex:1; min-width:280px">
-        <label>Tìm kiếm</label>
+        <label>Search</label>
         <input id="q" placeholder="Package ID, Serial, Name..." />
       </div>
       <div style="width:160px">
-        <label>Bộ lọc trạng thái</label>
+        <label>Status Filter</label>
         <select id="status">
-          <option value="">Tất cả</option>
+          <option value="">All</option>
           <option>READY_TO_SHIP</option>
           <option>SHIPPED</option>
+          <option>RETURN</option>
           <option>RETURNED</option>
           <option>CREATED</option>
         </select>
       </div>
       <div style="width:160px">
-        <label>Tồn kho</label>
+        <label>Inventory</label>
         <select id="inventory">
-          <option value="">Tất cả</option>
+          <option value="">All</option>
           <option>UNKNOWN</option>
           <option>IN_STOCK</option>
           <option>NOT_IN_STOCK</option>
         </select>
       </div>
       <div style="width:140px">
-        <label>Đăng bán</label>
+        <label>Posted</label>
         <select id="posted">
-          <option value="">Tất cả</option>
-          <option value="1">Đã đăng 🏷️</option>
-          <option value="0">Chưa đăng</option>
+          <option value="">All</option>
+          <option value="1">Posted 🏷️</option>
+          <option value="0">Not Posted</option>
         </select>
       </div>
       <div style="align-self: flex-end; padding-bottom: 2px">
-        <button onclick="exportCsv()" style="background:var(--primary); color:white; height:42px; padding:0 16px; font-size:14px">Xuất File</button>
+        <button onclick="exportCsv()" style="background:var(--primary); color:white; height:42px; padding:0 16px; font-size:14px">Export</button>
       </div>
     </div>
   </div>
@@ -306,7 +307,7 @@ function render() {
             <tbody>
               ${items.map(r=>{
                 let diff = 0;
-                if (r.status === 'HENBIN') {
+                if (r.status === 'RETURN') {
                   diff = 0;
                 } else if (r.status === 'SHIPPED' && r.shipped_at) {
                   diff = Math.ceil((new Date(r.shipped_at) - new Date(r.created_at)) / (86400000));

@@ -138,7 +138,7 @@ async function setMode(m){
   
   const hints = {
     SHIP: "Chế độ Xuất hàng: Tự động chuyển trạng thái SHIPPED.",
-    RETURN: "Chế độ Henbin: Tự động chuyển trạng thái HENBIN.",
+    RETURN: "Return mode: Auto-update status to RETURN.",
     INVENTORY: "Chế độ Kiểm hàng: Lưu danh sách kiểm kê trong ngày."
   };
   document.getElementById("modeHint").textContent = hints[m];
@@ -205,7 +205,7 @@ async function onScanSuccess(decodedText) {
     }
     else { flashError(); document.getElementById("scanErr").textContent = "Lỗi thêm kiểm kê"; }
   } else {
-    const statusMap = { SHIP: "SHIPPED", RETURN: "HENBIN" };
+    const statusMap = { SHIP: "SHIPPED", RETURN: "RETURN" };
     const toStatus = statusMap[MODE];
     const updateRes = await fetch(`/api/items/${it.id}/status`, { 
       method: "POST", 

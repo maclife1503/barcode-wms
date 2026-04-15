@@ -213,7 +213,7 @@ async function loadItem(){
   }
   
   let diffDays = 0;
-  if (it.status === 'HENBIN') {
+  if (it.status === 'RETURN') {
     diffDays = 0;
   } else if (it.status === 'SHIPPED' && it.shipped_at) {
     diffDays = Math.ceil(Math.abs(new Date(it.shipped_at) - new Date(it.created_at)) / 86400000);
@@ -229,7 +229,7 @@ async function loadItem(){
       <div class="row" style="margin-bottom:20px">
         ${isStaff ? `
           <button onclick="setStatus('SHIPPED')">🚚 Giao hàng</button>
-          <button onclick="setStatus('HENBIN')" style="background:#fff7ed; color:#c2410c">🔄 Hoàn trả</button>
+          <button onclick="setStatus('RETURN')" style="background:#fff7ed; color:#c2410c">↩️ Return</button>
           <button onclick="setInventory('IN_STOCK')" style="background:#eff6ff; color:#1d4ed8">📦 Vào kho</button>
         ` : ""}
         <button onclick="togglePosted()" style="background:#fef9c3; color:#854d0e">🏷️ ${currentItem.is_posted ? 'Hủy đăng bán' : 'Đánh dấu đã đăng'}</button>

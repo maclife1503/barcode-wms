@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS items (
   coverage TEXT,
   tracking_code TEXT,
 
-  status TEXT NOT NULL DEFAULT 'CREATED', -- CREATED | READY_TO_SHIP | SHIPPED | HENBIN
+  status TEXT NOT NULL DEFAULT 'CREATED', -- CREATED | READY_TO_SHIP | SHIPPED | RETURN
   inventory_status TEXT NOT NULL DEFAULT 'UNKNOWN', -- UNKNOWN | IN_STOCK | NOT_IN_STOCK
   last_inventory_at TEXT,
   last_inventory_by TEXT,

@@ -613,7 +613,7 @@ app.post("/api/external/create", async (req, res) => {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `🟡 READY_TO_SHIP`, callback_data: "none" },
+          { text: `READY`, callback_data: "none" },
           { text: "🗑️", callback_data: `request_delete_tg:${newItem.id}` }
         ],
         [
@@ -1853,7 +1853,7 @@ async function syncTelegramButtons(itemId) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `${{ 'READY_TO_SHIP': '🟡', 'SHIPPED': '🟢', 'HENBIN': '⚫', 'RETURNED': '⚫', 'CREATED': '⬜' }[item.status] || '⬜'} ${item.status}`, callback_data: "none" },
+          { text: `${item.status}`, callback_data: "none" },
           { text: "🗑️", callback_data: `request_delete_tg:${item.id}` }
         ],
         [
