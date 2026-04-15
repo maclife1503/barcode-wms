@@ -1,11 +1,13 @@
 <!doctype html>
 <html>
+
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="utf-8" />
   <link rel="stylesheet" href="styles.css" />
   <title>List - WMS</title>
 </head>
+
 <body>
   <div class="no-print topbar">
     <div class="nav">
@@ -67,7 +69,8 @@
         </select>
       </div>
       <div style="align-self: flex-end; padding-bottom: 2px">
-        <button onclick="exportCsv()" style="background:var(--primary); color:white; height:42px; padding:0 16px; font-size:14px">Export</button>
+        <button onclick="exportCsv()"
+          style="background:var(--primary); color:white; height:42px; padding:0 16px; font-size:14px">Export</button>
       </div>
     </div>
   </div>
@@ -75,13 +78,13 @@
   <div id="dashboard"></div>
   <div id="tbl"></div>
 
-<script>
-let selectedCategory = null;
-let currentTab = 'stock';
+  <script>
+    let selectedCategory = null;
+    let currentTab = 'stock';
 
-// Thêm style cho Tab
-const style = document.createElement('style');
-style.textContent = `
+    // Thêm style cho Tab
+    const style = document.createElement('style');
+    style.textContent = `
   .tab-btn {
     background: white;
     color: var(--muted);
@@ -98,195 +101,195 @@ style.textContent = `
     box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);
   }
 `;
-document.head.appendChild(style);
+    document.head.appendChild(style);
 
-function esc(s){
-  return (s ?? "").replace(/[&<>"']/g, m => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[m]));
-}
-
-function showToast(msg, isError = false) {
-  let toast = document.getElementById('_toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = '_toast';
-    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;transition:opacity 0.3s;box-shadow:0 4px 16px rgba(0,0,0,0.15);';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = msg;
-  toast.style.background = isError ? '#ef4444' : '#22c55e';
-  toast.style.color = 'white';
-  toast.style.opacity = '1';
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
-}
-
-function fmtTime(s) {
-  if (!s) return "-";
-  try {
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return s;
-    return d.toLocaleString();
-  } catch(e) { return s; }
-}
-
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  location.href="/login.html";
-}
-
-async function requestDelete(id, name) {
-  if (!confirm(`Gửi yêu cầu xóa sản phẩm:\n"${name}"?\n\nYêu cầu sẽ được gửi tới admin để duyệt.`)) return;
-  try {
-    const r = await fetch(`/api/items/${id}/request-delete`, { method: 'POST' });
-    const j = await r.json();
-    if (j.ok) {
-      showToast('✅ Đã gửi yêu cầu xóa tới admin!');
-    } else {
-      showToast('❌ ' + (j.error || 'Lỗi không xác định'), true);
+    function esc(s) {
+      return (s ?? "").replace(/[&<>"']/g, m => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[m]));
     }
-  } catch(e) {
-    showToast('❌ Kết nối thất bại', true);
-  }
-}
 
-async function checkAuth() {
-  const r = await fetch("/api/me"); const j = await r.json();
-  if (j.role === 'admin' && j.user === 'tho') {
-    document.getElementById("navSettings").style.display = "inline-block";
-  } else if (j.role === 'entry') {
-    document.getElementById("navScan").style.display = "none";
-    document.getElementById("navInventory").style.display = "none";
-    // Tự động đá ra khỏi trang nếu cố tình vào
-    if (location.pathname === "/scan.html" || 
-        location.pathname === "/inventory.html" || 
-        location.pathname === "/settings.html") {
-      location.href = "/list.html";
+    function showToast(msg, isError = false) {
+      let toast = document.getElementById('_toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = '_toast';
+        toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;transition:opacity 0.3s;box-shadow:0 4px 16px rgba(0,0,0,0.15);';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = msg;
+      toast.style.background = isError ? '#ef4444' : '#22c55e';
+      toast.style.color = 'white';
+      toast.style.opacity = '1';
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
     }
-  }
-}
-checkAuth();
 
-function setTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById(`tab-${tab}`).classList.add('active');
-  
-  // Nếu chọn tab khác All, reset status dropdown để tránh xung đột
-  if (tab !== 'all') {
-    document.getElementById("status").value = "";
-    if (tab === 'not_posted') document.getElementById("posted").value = "";
-  }
-  
-  load();
-}
+    function fmtTime(s) {
+      if (!s) return "-";
+      try {
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return s;
+        return d.toLocaleString();
+      } catch (e) { return s; }
+    }
 
-function setFilter(cat) {
-  selectedCategory = cat;
-  document.getElementById("filterPath").innerHTML = cat 
-    ? `Đang lọc: ${esc(cat)} <span onclick="setFilter(null)" style="cursor:pointer; color:#ef4444; margin-left:8px">✖ Hiện tất cả</span>`
-    : "";
-  render();
-}
+    async function logout() {
+      await fetch("/api/logout", { method: "POST" });
+      location.href = "/login.html";
+    }
 
-let cachedData = null;
+    async function requestDelete(id, name) {
+      if (!confirm(`Gửi yêu cầu xóa sản phẩm:\n"${name}"?\n\nYêu cầu sẽ được gửi tới admin để duyệt.`)) return;
+      try {
+        const r = await fetch(`/api/items/${id}/request-delete`, { method: 'POST' });
+        const j = await r.json();
+        if (j.ok) {
+          showToast('✅ Đã gửi yêu cầu xóa tới admin!');
+        } else {
+          showToast('❌ ' + (j.error || 'Lỗi không xác định'), true);
+        }
+      } catch (e) {
+        showToast('❌ Kết nối thất bại', true);
+      }
+    }
 
-async function load(){
-  const qEl = document.getElementById("q");
-  const statusEl = document.getElementById("status");
-  const inventoryEl = document.getElementById("inventory");
-  const postedEl = document.getElementById("posted");
+    async function checkAuth() {
+      const r = await fetch("/api/me"); const j = await r.json();
+      if (j.role === 'admin' && j.user === 'tho') {
+        document.getElementById("navSettings").style.display = "inline-block";
+      } else if (j.role === 'entry') {
+        document.getElementById("navScan").style.display = "none";
+        document.getElementById("navInventory").style.display = "none";
+        // Tự động đá ra khỏi trang nếu cố tình vào
+        if (location.pathname === "/scan.html" ||
+          location.pathname === "/inventory.html" ||
+          location.pathname === "/settings.html") {
+          location.href = "/list.html";
+        }
+      }
+    }
+    checkAuth();
 
-  const u = new URL("/api/items", location.origin);
-  if (qEl.value) u.searchParams.set("q", qEl.value);
-  if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
-  if (postedEl.value) u.searchParams.set("posted", postedEl.value);
-  
-  // Tab vs Status Dropdown
-  if (currentTab !== 'all') {
-    u.searchParams.set("tab", currentTab);
-  } else if (statusEl.value) {
-    u.searchParams.set("status", statusEl.value);
-  }
+    function setTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
 
-  const r = await fetch(u);
-  cachedData = await r.json();
-  render();
-}
+      // Nếu chọn tab khác All, reset status dropdown để tránh xung đột
+      if (tab !== 'all') {
+        document.getElementById("status").value = "";
+        if (tab === 'not_posted') document.getElementById("posted").value = "";
+      }
 
-async function exportCsv() {
-  const qEl = document.getElementById("q");
-  const statusEl = document.getElementById("status");
-  const inventoryEl = document.getElementById("inventory");
-  const postedEl = document.getElementById("posted");
+      load();
+    }
 
-  const u = new URL("/api/items/export", location.origin);
-  if (qEl.value) u.searchParams.set("q", qEl.value);
-  if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
-  if (postedEl.value) u.searchParams.set("posted", postedEl.value);
-  
-  if (currentTab !== 'all') {
-    u.searchParams.set("tab", currentTab);
-  } else if (statusEl.value) {
-    u.searchParams.set("status", statusEl.value);
-  }
+    function setFilter(cat) {
+      selectedCategory = cat;
+      document.getElementById("filterPath").innerHTML = cat
+        ? `Đang lọc: ${esc(cat)} <span onclick="setFilter(null)" style="cursor:pointer; color:#ef4444; margin-left:8px">✖ Hiện tất cả</span>`
+        : "";
+      render();
+    }
 
-  const res = await fetch(u, { method: "POST" });
-  const j = await res.json();
-  if (j.url) {
-    window.open(j.url, "_blank");
-  } else {
-    alert("Không có dữ liệu để xuất hoặc có lỗi xảy ra.");
-  }
-}
+    let cachedData = null;
 
-function render() {
-  if (!cachedData) return;
-  const tblEl = document.getElementById("tbl");
-  const dashEl = document.getElementById("dashboard");
+    async function load() {
+      const qEl = document.getElementById("q");
+      const statusEl = document.getElementById("status");
+      const inventoryEl = document.getElementById("inventory");
+      const postedEl = document.getElementById("posted");
 
-  if (cachedData.error) {
-    tblEl.innerHTML = `<div class="card" style="color:#ef4444">${esc(cachedData.error)}</div>`;
-    return;
-  }
+      const u = new URL("/api/items", location.origin);
+      if (qEl.value) u.searchParams.set("q", qEl.value);
+      if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+      if (postedEl.value) u.searchParams.set("posted", postedEl.value);
 
-  // Dashboard
-  let dashHtml = `<div class="row" style="margin-bottom:10px">`;
-  dashHtml += `
+      // Tab vs Status Dropdown
+      if (currentTab !== 'all') {
+        u.searchParams.set("tab", currentTab);
+      } else if (statusEl.value) {
+        u.searchParams.set("status", statusEl.value);
+      }
+
+      const r = await fetch(u);
+      cachedData = await r.json();
+      render();
+    }
+
+    async function exportCsv() {
+      const qEl = document.getElementById("q");
+      const statusEl = document.getElementById("status");
+      const inventoryEl = document.getElementById("inventory");
+      const postedEl = document.getElementById("posted");
+
+      const u = new URL("/api/items/export", location.origin);
+      if (qEl.value) u.searchParams.set("q", qEl.value);
+      if (inventoryEl.value) u.searchParams.set("inventory", inventoryEl.value);
+      if (postedEl.value) u.searchParams.set("posted", postedEl.value);
+
+      if (currentTab !== 'all') {
+        u.searchParams.set("tab", currentTab);
+      } else if (statusEl.value) {
+        u.searchParams.set("status", statusEl.value);
+      }
+
+      const res = await fetch(u, { method: "POST" });
+      const j = await res.json();
+      if (j.url) {
+        window.open(j.url, "_blank");
+      } else {
+        alert("Không có dữ liệu để xuất hoặc có lỗi xảy ra.");
+      }
+    }
+
+    function render() {
+      if (!cachedData) return;
+      const tblEl = document.getElementById("tbl");
+      const dashEl = document.getElementById("dashboard");
+
+      if (cachedData.error) {
+        tblEl.innerHTML = `<div class="card" style="color:#ef4444">${esc(cachedData.error)}</div>`;
+        return;
+      }
+
+      // Dashboard
+      let dashHtml = `<div class="row" style="margin-bottom:10px">`;
+      dashHtml += `
     <div class="card interactive" onclick="setFilter(null)" style="flex:1; min-width:120px; text-align:center; ${!selectedCategory ? 'border-color:var(--primary); background:var(--primary-light)' : ''}">
       <div style="font-size:12px; color:var(--muted)">Tổng cộng</div>
       <div style="font-size:24px; font-weight:800; color:var(--primary)">${cachedData.rows.length}</div>
     </div>
   `;
-  (cachedData.summary || []).forEach(s => {
-    const isActive = selectedCategory === s.category;
-    dashHtml += `
+      (cachedData.summary || []).forEach(s => {
+        const isActive = selectedCategory === s.category;
+        dashHtml += `
       <div class="card interactive" onclick="setFilter('${esc(s.category)}')" style="flex:1; min-width:110px; text-align:center; ${isActive ? 'border-color:var(--primary); background:var(--primary-light)' : ''}">
         <div style="font-size:12px; color:var(--muted); text-transform:capitalize">${esc(s.category)}</div>
         <div style="font-size:20px; font-weight:700">${s.count}</div>
       </div>
     `;
-  });
-  dashHtml += `</div>`;
-  dashEl.innerHTML = dashHtml;
+      });
+      dashHtml += `</div>`;
+      dashEl.innerHTML = dashHtml;
 
-  // Grouping
-  const groups = {};
-  cachedData.rows.forEach(item => {
-    const cat = item.category || 'else';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(item);
-  });
+      // Grouping
+      const groups = {};
+      cachedData.rows.forEach(item => {
+        const cat = item.category || 'else';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(item);
+      });
 
-  let tablesHtml = "";
-  const sortedCats = Object.keys(groups).sort((a,b) => (a === 'else' ? 1 : b === 'else' ? -1 : a.localeCompare(b)));
+      let tablesHtml = "";
+      const sortedCats = Object.keys(groups).sort((a, b) => (a === 'else' ? 1 : b === 'else' ? -1 : a.localeCompare(b)));
 
-  sortedCats.forEach(cat => {
-    if (selectedCategory && cat !== selectedCategory) return;
+      sortedCats.forEach(cat => {
+        if (selectedCategory && cat !== selectedCategory) return;
 
-    const items = groups[cat];
-    tablesHtml += `
+        const items = groups[cat];
+        tablesHtml += `
       <h3 style="margin: 24px 0 12px; display:flex; align-items:center; gap:10px; text-transform:capitalize">
         ${esc(cat)} <span class="pill">${items.length}</span>
       </h3>
@@ -305,25 +308,25 @@ function render() {
               </tr>
             </thead>
             <tbody>
-              ${items.map(r=>{
-                let diff = 0;
-                if (r.status === 'RETURN') {
-                  diff = 0;
-                } else if (r.status === 'SHIPPED' && r.shipped_at) {
-                  diff = Math.ceil((new Date(r.shipped_at) - new Date(r.created_at)) / (86400000));
-                } else {
-                  diff = Math.ceil((new Date() - new Date(r.created_at)) / (86400000));
-                }
-                const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
-                return `
+              ${items.map(r => {
+          let diff = 0;
+          if (r.status === 'RETURN') {
+            diff = 0;
+          } else if (r.status === 'SHIPPED' && r.shipped_at) {
+            diff = Math.ceil((new Date(r.shipped_at) - new Date(r.created_at)) / (86400000));
+          } else {
+            diff = Math.ceil((new Date() - new Date(r.created_at)) / (86400000));
+          }
+          const isStale = (r.status === 'READY_TO_SHIP' || r.status === 'CREATED') && diff > 15;
+          return `
                 <tr style="${isStale ? 'background:#fff1f2' : ''}">
                   <td style="font-weight:600"><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
                   <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">
                     ${r.is_posted ? '<span title="Đã đăng bán">🏷️</span> ' : ''}${esc(r.name)}
                   </td>
                   <td class="hide-mobile" style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
-                  <td><span class="pill" style="background:${r.status==='SHIPPED'?'#dcfce7':'#f1f5f9'}; color:${r.status==='SHIPPED'?'#166534':'var(--text)'}">${esc(r.status)}</span><button onclick="requestDelete(${r.id}, '${esc(r.name).replace(/'/g, String.fromCharCode(39))}')" title="Yêu cầu xóa" style="background:none;border:1.5px solid #fca5a5;color:#ef4444;border-radius:6px;padding:1px 6px;cursor:pointer;font-size:12px;margin-left:5px;vertical-align:middle">🗑️</button></td>
-                  <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status==='IN_STOCK'?'#dbeafe':'#f1f5f9'}">${esc(r.inventory_status)}</span></td>
+                  <td>${statusPill(r.status)}<button onclick="requestDelete(${r.id}, '${esc(r.name).replace(/'/g, String.fromCharCode(39))}')" title="Request delete" style="background:none;border:1.5px solid #fca5a5;color:#ef4444;border-radius:6px;padding:1px 6px;cursor:pointer;font-size:12px;margin-left:5px;vertical-align:middle">🗑️</button></td>
+                  <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status === 'IN_STOCK' ? '#dbeafe' : '#f1f5f9'}">${esc(r.inventory_status)}</span></td>
                   <td class="hide-mobile">${diff} ngày ${isStale ? '⚠️' : ''}</td>
                   <td class="hide-mobile" style="font-size:12px; color:var(--muted)">${fmtTime(r.updated_at)}</td>
                 </tr>
@@ -333,29 +336,30 @@ function render() {
         </div>
       </div>
     `;
-  });
+      });
 
-  tblEl.innerHTML = tablesHtml || `<div class="card" style="text-align:center; color:var(--muted)">Không tìm thấy sản phẩm nào</div>`;
-}
+      tblEl.innerHTML = tablesHtml || `<div class="card" style="text-align:center; color:var(--muted)">Không tìm thấy sản phẩm nào</div>`;
+    }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const qEl = document.getElementById("q");
-  const statusEl = document.getElementById("status");
-  const inventoryEl = document.getElementById("inventory");
+    document.addEventListener("DOMContentLoaded", () => {
+      const qEl = document.getElementById("q");
+      const statusEl = document.getElementById("status");
+      const inventoryEl = document.getElementById("inventory");
 
-  let debounceTimer = null;
-  qEl.addEventListener("input", () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(load, 300);
-  });
-  
-  qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
-  statusEl.addEventListener("change", load);
-  inventoryEl.addEventListener("change", load);
-  document.getElementById("posted").addEventListener("change", load);
+      let debounceTimer = null;
+      qEl.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(load, 300);
+      });
 
-  load();
-});
-</script>
+      qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
+      statusEl.addEventListener("change", load);
+      inventoryEl.addEventListener("change", load);
+      document.getElementById("posted").addEventListener("change", load);
+
+      load();
+    });
+  </script>
 </body>
+
 </html>
