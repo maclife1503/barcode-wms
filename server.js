@@ -929,7 +929,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
   const msg = req.body.message;
   if (!msg || !msg.chat) return res.sendStatus(200);
   const chatId = String(msg.chat.id);
-  if (chatId !== String(authorizedChatId)) return res.sendStatus(200);
+  if (chatId !== String(authorizedChatId) && chatId !== String(DELETE_GROUP_CHAT_ID)) return res.sendStatus(200);
 
   // Handle Serial as Text (Mark as Posted)
   if (msg.text) {
@@ -960,10 +960,124 @@ app.post("/api/telegram/webhook", async (req, res) => {
         console.error("Telegram text processing failed:", e);
       }
     }
+
+    // ── Task / Reminder ──────────────────────────────────────────
+    if (msg.text && /^(nhắc|remind|task)\s*:/i.test(msg.text.trim())) {
+      try {
+        const raw = msg.text.replace(/^(nhắc|remind|task)\s*:/i, "").trim();
+
+        // Parse time: 30p | 1h | 2h30p | 14:30 | 9h30
+        let dueMs = null;
+        let title = raw;
+        const VN_OFFSET = 7 * 3600000;
+        const nowVN = () => Date.now() + VN_OFFSET;
+
+        // Pattern 1: ends with NhMp or Nh or Mp
+        const relMatch = raw.match(/(\d+h)?(\d+p)?\s*$/i);
+        const clockMatch = raw.match(/(?:lúc\s*)?(\d{1,2})[h:](\d{2})/i);
+        const hOnly = raw.match(/(\d+)h\s*$/i);
+        const mOnly = raw.match(/(\d+)p\s*$/i);
+
+        if (clockMatch) {
+          const hh = parseInt(clockMatch[1]), mm = parseInt(clockMatch[2]);
+          const todayVN = new Date(nowVN());
+          let due = new Date(Date.UTC(todayVN.getUTCFullYear(), todayVN.getUTCMonth(), todayVN.getUTCDate(), hh - 7, mm));
+          if (due.getTime() <= Date.now()) due = new Date(due.getTime() + 86400000); // tomorrow
+          dueMs = due.getTime();
+          title = raw.replace(clockMatch[0], "").replace(/\s*(lúc)?\s*$/, "").trim();
+        } else if (hOnly && mOnly && relMatch[1] && relMatch[2]) {
+          const h = parseInt(relMatch[1]), m = parseInt(relMatch[2]);
+          dueMs = Date.now() + (h * 3600 + m * 60) * 1000;
+          title = raw.replace(relMatch[0].trim(), "").trim();
+        } else if (hOnly) {
+          const h = parseInt(hOnly[1]);
+          dueMs = Date.now() + h * 3600000;
+          title = raw.replace(hOnly[0].trim(), "").trim();
+        } else if (mOnly) {
+          const m = parseInt(mOnly[1]);
+          dueMs = Date.now() + m * 60000;
+          title = raw.replace(mOnly[0].trim(), "").trim();
+        }
+
+        if (!dueMs || !title) {
+          await sendTelegramMessage(`⚠️ Không hiểu thời gian. Ví dụ:\n<code>nhắc: Kiểm hàng 30p</code>\n<code>nhắc: Gọi khách 1h30p</code>\n<code>nhắc: Meeting 14:30</code>`);
+        } else {
+          const due_at = new Date(dueMs).toISOString();
+          const created_at = nowISO();
+          const from = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || "TG");
+          const chatId = String(msg.chat.id);
+
+          const result = await db.execute({
+            sql: "INSERT INTO tasks (title, due_at, chat_id, created_by, status, created_at) VALUES (?,?,?,?,?,?)",
+            args: [title, due_at, chatId, from, "PENDING", created_at]
+          });
+          const taskId = Number(result.lastInsertRowid);
+
+          // Format due time in Vietnam TZ
+          const dueVN = new Date(dueMs + VN_OFFSET);
+          const dueStr = `${String(dueVN.getUTCHours()).padStart(2,"0")}:${String(dueVN.getUTCMinutes()).padStart(2,"0")}`;
+
+          await sendTelegramMessage(
+            `⏰ <b>Đã đặt nhắc:</b> ${escTg(title)}\n🕐 Nhắc lúc: <b>${dueStr}</b>`,
+            { inline_keyboard: [[{ text: "❌ Huỷ nhắc", callback_data: `task_cancel:${taskId}` }]] }
+          );
+        }
+      } catch(e) { console.error("Task creation failed:", e); }
+    }
   }
 
   res.sendStatus(200);
 });
+
+// ── Task callbacks: done / snooze / cancel ────────────────────────────
+// (handled inside existing callback_query block above via action routing)
+
+// ── Background scheduler: fire due reminders every 30s ───────────────
+setInterval(async () => {
+  try {
+    const now = nowISO();
+    const { rows } = await db.execute({
+      sql: "SELECT * FROM tasks WHERE status = 'PENDING' AND due_at <= ? ORDER BY due_at ASC LIMIT 20",
+      args: [now]
+    });
+
+    for (const task of rows) {
+      const markup = {
+        inline_keyboard: [[
+          { text: "✅ Xong", callback_data: `task_done:${task.id}` },
+          { text: "⏰ +15p", callback_data: `task_snooze15:${task.id}` },
+          { text: "⏰ +1h",  callback_data: `task_snooze60:${task.id}` }
+        ]]
+      };
+
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const count = (task.remind_count || 0) + 1;
+      const prefix = count > 1 ? `🔔×${count} ` : "🔔 ";
+
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: task.chat_id,
+            text: `${prefix}<b>Nhắc nhở:</b> ${escTg(task.title)}`,
+            parse_mode: "HTML",
+            reply_markup: markup
+          })
+        });
+        const tgData = await tgRes.json();
+        const newMsgId = tgData.ok ? String(tgData.result.message_id) : null;
+
+        // Snooze 5p nếu chưa có phản hồi (tránh spam)
+        const nextDue = new Date(Date.now() + 5 * 60000).toISOString();
+        await db.execute({
+          sql: "UPDATE tasks SET status='PENDING', due_at=?, remind_count=?, tg_msg_id=? WHERE id=?",
+          args: [nextDue, count, newMsgId, task.id]
+        });
+      } catch(e) { console.error("Reminder send failed:", e); }
+    }
+  } catch(e) { console.error("Scheduler error:", e); }
+}, 30000);
+
 
 function buildItemQuery(req) {
   const q = req.query.q;
@@ -988,9 +1102,9 @@ function buildItemQuery(req) {
   } else if (tab === 'shipped') {
     where.push(`status = 'SHIPPED'`);
   } else if (tab === 'return') {
-    where.push(`status IN ('HENBIN', 'RETURNED')`);
+    where.push(`status IN ('HENBIN', 'RETURNED', 'RETURN')`);
   } else if (tab === 'not_posted') {
-    where.push(`is_posted = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN')`);
+    where.push(`is_posted = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN', 'RETURN')`);
   } else if (status) {
     where.push(`status = ?`);
     params.push(status);
@@ -1463,6 +1577,58 @@ app.post("/api/items/:id/meru-logged", requireAuth, async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+// ====== Shortcut API: Mark as Posted by Serial ======
+app.post("/api/external/mark-posted", async (req, res) => {
+  const apiKey = req.headers["x-api-key"];
+  if (!apiKey || apiKey !== process.env.SHORTCUT_API_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const serial = (req.body.serial ?? "").trim();
+  if (!serial || serial.length < 4) {
+    return res.status(400).json({ error: "Missing or too short serial" });
+  }
+
+  try {
+    const { rows } = await db.execute({
+      sql: "SELECT * FROM items WHERE (serial_clean = ? OR serial_raw = ?) AND is_deleted = 0 LIMIT 1",
+      args: [serial, serial]
+    });
+    const item = rows[0];
+
+    if (!item) {
+      return res.json({ ok: false, error: `Serial not found: ${serial}` });
+    }
+
+    if (item.is_posted) {
+      return res.json({ ok: true, already: true, message: `Already posted: ${item.package_id} (${item.serial_clean})` });
+    }
+
+    const updated_at = nowISO();
+    await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, item.id] });
+    await db.execute({
+      sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)",
+      args: [item.id, "Shortcut", JSON.stringify({ is_posted: 1, method: "shortcut" }), updated_at]
+    });
+
+    // Sync Telegram buttons
+    syncTelegramButtons(item.id).catch(e => console.error("Sync TG mark-posted failed:", e));
+
+    // Send TG notification to group
+    try {
+      const msg = `✅ <b>Đã đăng (Shortcut)</b>\n📦 ID: <code>${item.package_id}</code>\n🏷️ ${escTg(item.name)}\n🔢 Serial: <code>${item.serial_clean || "-"}</code>`;
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: DELETE_GROUP_CHAT_ID, text: msg, parse_mode: "HTML" })
+      });
+    } catch(e) { console.error("TG notify mark-posted failed:", e); }
+
+    res.json({ ok: true, message: `Marked as posted: ${item.package_id} — ${item.name} (${item.serial_clean})` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ====== Batch Update Posted Status by Serials ======

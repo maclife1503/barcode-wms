@@ -164,6 +164,18 @@ CREATE TABLE IF NOT EXISTS delete_requests (
   resolved_at TEXT,
   FOREIGN KEY(item_id) REFERENCES items(id)
 );
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  due_at TEXT NOT NULL,         -- ISO datetime
+  chat_id TEXT NOT NULL,
+  created_by TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING | DONE | SNOOZED
+  tg_msg_id TEXT,               -- tin nhắn reminder (để edit/xóa)
+  remind_count INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL
+);
   `);
 
   // Migration: Thêm cột priority nếu chưa có
