@@ -613,8 +613,8 @@ app.post("/api/external/create", async (req, res) => {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `📍 Status: READY_TO_SHIP`, callback_data: "none" },
-          { text: "🗑️ Yêu cầu xóa", callback_data: `request_delete_tg:${newItem.id}` }
+          { text: `READY`, callback_data: "none" },
+          { text: "🗑️", callback_data: `request_delete_tg:${newItem.id}` }
         ],
         [
           { text: "🔴 Post Meru", callback_data: `posted:${newItem.id}` },
@@ -806,7 +806,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
               args: [String(tgData.result.chat.id), String(tgData.result.message_id), newReqId]
             });
           }
-        } catch(e) { console.error("Telegram delete request from TG button failed:", e); }
+        } catch (e) { console.error("Telegram delete request from TG button failed:", e); }
 
         await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -853,7 +853,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ chat_id: reqData.item_tg_chat, message_id: Number(reqData.item_tg_msg) })
             });
-          } catch(e) { console.error("Delete item TG msg failed:", e); }
+          } catch (e) { console.error("Delete item TG msg failed:", e); }
         }
 
         // Xóa tin nhắn yêu cầu trong group
@@ -863,7 +863,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ chat_id: reqData.tg_chat_id, message_id: Number(reqData.tg_msg_id) })
             });
-          } catch(e) { console.error("Delete request TG msg failed:", e); }
+          } catch (e) { console.error("Delete request TG msg failed:", e); }
         }
 
         await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
@@ -902,7 +902,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ chat_id: reqData.tg_chat_id, message_id: Number(reqData.tg_msg_id) })
             });
-          } catch(e) { console.error("Delete reject TG msg failed:", e); }
+          } catch (e) { console.error("Delete reject TG msg failed:", e); }
         }
 
         await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
@@ -1346,9 +1346,9 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
     inventory_status = "NOT_IN_STOCK";
   }
 
-  await db.execute({ 
-    sql: "UPDATE items SET status = ?, inventory_status = ?, shipped_at = ?, updated_at = ? WHERE id = ?", 
-    args: [to_status, inventory_status, shipped_at, updated_at, id] 
+  await db.execute({
+    sql: "UPDATE items SET status = ?, inventory_status = ?, shipped_at = ?, updated_at = ? WHERE id = ?",
+    args: [to_status, inventory_status, shipped_at, updated_at, id]
   });
 
   // CHỈ ghi log nếu trạng thái thay đổi
@@ -1853,16 +1853,16 @@ async function syncTelegramButtons(itemId) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `📍 Trạng thái: ${item.status}`, callback_data: "none" },
+          { text: `${item.status}`, callback_data: "none" },
           { text: "🗑️ Yêu cầu xóa", callback_data: `request_delete_tg:${item.id}` }
         ],
         [
-          item.is_posted 
-             ? { text: "🟢 Posted", callback_data: `posted:${item.id}` } 
-             : { text: "🔴 Post Meru", callback_data: `posted:${item.id}` },
+          item.is_posted
+            ? { text: "🟢 Posted", callback_data: `posted:${item.id}` }
+            : { text: "🔴 Post Meru", callback_data: `posted:${item.id}` },
           item.is_meru_logged
-             ? { text: "🟢 Logged", callback_data: `meru:${item.id}` }
-             : { text: "🔴 Log Meru", callback_data: `meru:${item.id}` }
+            ? { text: "🟢 Logged", callback_data: `meru:${item.id}` }
+            : { text: "🔴 Log Meru", callback_data: `meru:${item.id}` }
         ]
       ]
     };
