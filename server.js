@@ -613,7 +613,8 @@ app.post("/api/external/create", async (req, res) => {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `📍 Status: READY_TO_SHIP`, callback_data: "none" }
+          { text: `📍 Status: READY_TO_SHIP`, callback_data: "none" },
+          { text: "🗑️ Yêu cầu xóa", callback_data: `request_delete_tg:${newItem.id}` }
         ],
         [
           { text: "🔴 Post Meru", callback_data: `posted:${newItem.id}` },
@@ -735,6 +736,83 @@ app.post("/api/telegram/webhook", async (req, res) => {
             });
           }
         }
+      }
+
+      if (action === "request_delete_tg") {
+        const itemId2 = itemId;
+        const { rows: iRows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ? AND is_deleted = 0", args: [itemId2] });
+        const itemData = iRows[0];
+
+        if (!itemData) {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "❌ Không tìm thấy sản phẩm.", show_alert: true })
+          });
+          return res.sendStatus(200);
+        }
+
+        // Kiểm tra pending request
+        const { rows: pendingRows } = await db.execute({
+          sql: "SELECT id FROM delete_requests WHERE item_id = ? AND status = 'PENDING'",
+          args: [itemId2]
+        });
+        if (pendingRows[0]) {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "⚠️ Đã có yêu cầu xóa đang chờ duyệt!", show_alert: true })
+          });
+          return res.sendStatus(200);
+        }
+
+        const t = nowISO();
+        const requester = cb.from.username ? `@${cb.from.username}` : (cb.from.first_name || 'Telegram user');
+
+        await db.execute({
+          sql: "INSERT INTO delete_requests (item_id, requested_by, status, created_at) VALUES (?, ?, 'PENDING', ?)",
+          args: [itemId2, requester, t]
+        });
+
+        const { rows: newReqRows } = await db.execute({
+          sql: "SELECT id FROM delete_requests WHERE item_id = ? AND status = 'PENDING' ORDER BY id DESC LIMIT 1",
+          args: [itemId2]
+        });
+        const newReqId = newReqRows[0].id;
+
+        // Gửi yêu cầu vào group
+        const delMsg = `🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>\n\n` +
+          `📦 ID: <code>${itemData.package_id}</code>\n` +
+          `🏷️ Tên: <b>${escTg(itemData.name)}</b>\n` +
+          `🔢 Serial: <code>${itemData.serial_clean || "-"}</code>\n` +
+          `📍 Trạng thái: ${itemData.status}\n` +
+          `👤 Yêu cầu bởi: <b>${escTg(requester)}</b>\n` +
+          `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+
+        const delMarkup = {
+          inline_keyboard: [[
+            { text: "✅ Duyệt xóa", callback_data: `approve_delete:${newReqId}` },
+            { text: "❌ Từ chối", callback_data: `reject_delete:${newReqId}` }
+          ]]
+        };
+
+        try {
+          const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: DELETE_GROUP_CHAT_ID, text: delMsg, parse_mode: "HTML", reply_markup: delMarkup })
+          });
+          const tgData = await tgRes.json();
+          if (tgData.ok && tgData.result) {
+            await db.execute({
+              sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
+              args: [String(tgData.result.chat.id), String(tgData.result.message_id), newReqId]
+            });
+          }
+        } catch(e) { console.error("Telegram delete request from TG button failed:", e); }
+
+        await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback_query_id: cb.id, text: "✅ Đã gửi yêu cầu xóa tới admin!", show_alert: true })
+        });
+        return res.sendStatus(200);
       }
 
       if (action === "approve_delete") {
@@ -1775,7 +1853,8 @@ async function syncTelegramButtons(itemId) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `📍 Trạng thái: ${item.status}`, callback_data: "none" }
+          { text: `📍 Trạng thái: ${item.status}`, callback_data: "none" },
+          { text: "🗑️ Yêu cầu xóa", callback_data: `request_delete_tg:${item.id}` }
         ],
         [
           item.is_posted 
