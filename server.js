@@ -1322,7 +1322,7 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   const { id } = req.params;
   const { to_status } = req.body;
 
-  const allowed = new Set(["READY_TO_SHIP", "SHIPPED", "HENBIN", "CREATED"]);
+  const allowed = new Set(["READY_TO_SHIP", "SHIPPED", "RETURN", "CREATED"]);
   if (!allowed.has(to_status)) return res.status(400).json({ error: "Invalid status" });
 
   const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
@@ -1342,7 +1342,7 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   if (to_status === "SHIPPED") {
     inventory_status = "NOT_IN_STOCK";
     shipped_at = updated_at;
-  } else if (to_status === "HENBIN") {
+  } else if (to_status === "RETURN") {
     inventory_status = "NOT_IN_STOCK";
   }
 
