@@ -152,6 +152,18 @@ CREATE TABLE IF NOT EXISTS category_rules (
   keywords TEXT NOT NULL, -- dấu phẩy cách nhau
   priority INTEGER DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS delete_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  requested_by TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING | APPROVED | REJECTED
+  tg_chat_id TEXT,
+  tg_msg_id TEXT,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT,
+  FOREIGN KEY(item_id) REFERENCES items(id)
+);
   `);
 
   // Migration: Thêm cột priority nếu chưa có

@@ -27,6 +27,9 @@ const USERS = {
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 
+// Group nhận yêu cầu xóa
+const DELETE_GROUP_CHAT_ID = process.env.DELETE_GROUP_CHAT_ID || "-1003710611209";
+
 function sign(val) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(val).digest("hex");
 }
@@ -650,7 +653,8 @@ app.post("/api/telegram/webhook", async (req, res) => {
   if (req.body.callback_query) {
     const cb = req.body.callback_query;
     const chatId = String(cb.message.chat.id);
-    if (chatId !== String(authorizedChatId)) return res.sendStatus(200);
+    const isFromAuthorizedChat = chatId === String(authorizedChatId) || chatId === String(DELETE_GROUP_CHAT_ID);
+    if (!isFromAuthorizedChat) return res.sendStatus(200);
 
     const [action, itemId] = cb.data.split(":");
     try {
@@ -731,6 +735,103 @@ app.post("/api/telegram/webhook", async (req, res) => {
             });
           }
         }
+      }
+
+      if (action === "approve_delete") {
+        const reqId = itemId;
+        const { rows: reqRows } = await db.execute({
+          sql: `SELECT dr.*, i.package_id, i.name, i.tg_chat_id as item_tg_chat, i.tg_msg_id as item_tg_msg
+                FROM delete_requests dr JOIN items i ON dr.item_id = i.id WHERE dr.id = ?`,
+          args: [reqId]
+        });
+        const reqData = reqRows[0];
+
+        if (!reqData || reqData.status !== 'PENDING') {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "⚠️ Yêu cầu này đã được xử lý rồi.", show_alert: true })
+          });
+          return res.sendStatus(200);
+        }
+
+        const t = nowISO();
+
+        // Soft-delete item
+        await db.execute({
+          sql: `UPDATE items SET is_deleted=1, status='DELETED', deleted_at=?, deleted_by=?, updated_at=? WHERE id=?`,
+          args: [t, cb.from.username || cb.from.first_name || 'TelegramBot', t, reqData.item_id]
+        });
+
+        // Update request status
+        await db.execute({
+          sql: `UPDATE delete_requests SET status='APPROVED', resolved_at=? WHERE id=?`,
+          args: [t, reqId]
+        });
+
+        // Xóa tin nhắn gốc của item trên Telegram (nếu có)
+        if (reqData.item_tg_chat && reqData.item_tg_msg) {
+          try {
+            await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: reqData.item_tg_chat, message_id: Number(reqData.item_tg_msg) })
+            });
+          } catch(e) { console.error("Delete item TG msg failed:", e); }
+        }
+
+        // Xóa tin nhắn yêu cầu trong group
+        if (reqData.tg_chat_id && reqData.tg_msg_id) {
+          try {
+            await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: reqData.tg_chat_id, message_id: Number(reqData.tg_msg_id) })
+            });
+          } catch(e) { console.error("Delete request TG msg failed:", e); }
+        }
+
+        await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback_query_id: cb.id, text: `✅ Đã duyệt xóa: ${reqData.package_id}`, show_alert: true })
+        });
+        return res.sendStatus(200);
+      }
+
+      if (action === "reject_delete") {
+        const reqId = itemId;
+        const { rows: reqRows } = await db.execute({
+          sql: `SELECT * FROM delete_requests WHERE id = ?`,
+          args: [reqId]
+        });
+        const reqData = reqRows[0];
+
+        if (!reqData || reqData.status !== 'PENDING') {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "⚠️ Yêu cầu này đã được xử lý rồi.", show_alert: true })
+          });
+          return res.sendStatus(200);
+        }
+
+        const t = nowISO();
+        await db.execute({
+          sql: `UPDATE delete_requests SET status='REJECTED', resolved_at=? WHERE id=?`,
+          args: [t, reqId]
+        });
+
+        // Xóa tin nhắn yêu cầu trong group
+        if (reqData.tg_chat_id && reqData.tg_msg_id) {
+          try {
+            await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: reqData.tg_chat_id, message_id: Number(reqData.tg_msg_id) })
+            });
+          } catch(e) { console.error("Delete reject TG msg failed:", e); }
+        }
+
+        await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback_query_id: cb.id, text: "❌ Đã từ chối yêu cầu xóa.", show_alert: false })
+        });
+        return res.sendStatus(200);
       }
 
       // Luôn trả lời Telegram nếu chưa trả lời ở trên (để tắt spinner)
@@ -1475,6 +1576,80 @@ app.post("/api/telegram/notify-stale-manual", requireAuth, requireAdmin, async (
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ====== Request Delete (any authenticated user) ======
+app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
+  const id = req.params.id;
+
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ? AND is_deleted = 0", args: [id] });
+  const item = rows[0];
+  if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+
+  // Kiểm tra nếu đã có yêu cầu đang pending cho item này
+  const { rows: pendingRows } = await db.execute({
+    sql: "SELECT id FROM delete_requests WHERE item_id = ? AND status = 'PENDING'",
+    args: [id]
+  });
+  if (pendingRows[0]) {
+    return res.status(409).json({ error: "Đã có yêu cầu xóa đang chờ duyệt cho sản phẩm này" });
+  }
+
+  const t = nowISO();
+
+  await db.execute({
+    sql: "INSERT INTO delete_requests (item_id, requested_by, status, created_at) VALUES (?, ?, 'PENDING', ?)",
+    args: [id, req.user, t]
+  });
+
+  const { rows: reqRows } = await db.execute({
+    sql: "SELECT id FROM delete_requests WHERE item_id = ? AND status = 'PENDING' ORDER BY id DESC LIMIT 1",
+    args: [id]
+  });
+  const reqId = reqRows[0].id;
+
+  // Gửi thông báo Telegram tới group
+  const tgToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (tgToken) {
+    const msg = `🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>\n\n` +
+      `📦 ID: <code>${item.package_id}</code>\n` +
+      `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
+      `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+      `📍 Trạng thái: ${item.status}\n` +
+      `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>\n` +
+      `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+
+    const replyMarkup = {
+      inline_keyboard: [[
+        { text: "✅ Duyệt xóa", callback_data: `approve_delete:${reqId}` },
+        { text: "❌ Từ chối", callback_data: `reject_delete:${reqId}` }
+      ]]
+    };
+
+    try {
+      const tgRes = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: DELETE_GROUP_CHAT_ID,
+          text: msg,
+          parse_mode: "HTML",
+          reply_markup: replyMarkup
+        })
+      });
+      const tgData = await tgRes.json();
+      if (tgData.ok && tgData.result) {
+        await db.execute({
+          sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
+          args: [String(tgData.result.chat.id), String(tgData.result.message_id), reqId]
+        });
+      }
+    } catch (e) {
+      console.error("Send delete request to Telegram failed:", e);
+    }
+  }
+
+  res.json({ ok: true });
 });
 
 app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) => {
