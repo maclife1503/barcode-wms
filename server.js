@@ -660,11 +660,30 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
     const [action, itemId] = cb.data.split(":");
     try {
-      // Kiểm tra quyền hạn người dùng (Whitelist)
-      const authorizedUserIds = (process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
+      // Kiểm tra quyền hạn người dùng theo rule mới
+      const bongId = String(process.env.TELEGRAM_BONG || "").trim();
+      const aaronId = String(process.env.TELEGRAM_AARON || "").trim();
+      const adminId = "7818712996";
       const userId = String(cb.from.id);
 
-      if (authorizedUserIds.length > 0 && !authorizedUserIds.includes(userId)) {
+      // Phân quyền chi tiết
+      let allowed = false;
+
+      if (userId === adminId) {
+        allowed = true; // Admin có toàn quyền
+      } else if (bongId && userId === bongId) {
+        if (action === "posted") allowed = true;
+      } else if (aaronId && userId === aaronId) {
+        if (action === "request_delete_tg") allowed = true;
+      } else {
+        // Fallback for other users in the whitelist
+        const authorizedUserIds = (process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
+        if (authorizedUserIds.includes(userId)) {
+           allowed = true; 
+        }
+      }
+
+      if (!allowed) {
         const answerUrl = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
         await fetch(answerUrl, {
           method: "POST",
