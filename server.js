@@ -209,6 +209,12 @@ function fmtTimeLocal(iso) {
     return d.toLocaleString("vi-VN", { timeZone: "Asia/Tokyo" });
   } catch (e) { return iso; }
 }
+function getTgActorName(from) {
+  if (!from) return "Unknown (TG)";
+  const firstName = from.first_name || "User";
+  const username = from.username ? ` (@${from.username})` : "";
+  return `${firstName}${username} (Telegram)`;
+}
 
 // ====== Telegram Alerts ======
 async function sendTelegramMessage(text) {
@@ -709,8 +715,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
         if (item) {
           const updated_at = nowISO();
           const next_val = item.is_meru_logged ? 0 : 1;
+          const actor = getTgActorName(cb.from);
           await db.execute({ sql: "UPDATE items SET is_meru_logged = ?, updated_at = ? WHERE id = ?", args: [next_val, updated_at, itemId] });
-          await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_meru_logged: next_val }), updated_at] });
+          await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, actor, JSON.stringify({ is_meru_logged: next_val }), updated_at] });
 
           await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Meru failed:", e));
 
@@ -733,8 +740,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
         if (item) {
           const updated_at = nowISO();
           if (!item.is_posted) {
+            const actor = getTgActorName(cb.from);
             await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
-            await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, 'TelegramBot', JSON.stringify({ is_posted: 1 }), updated_at] });
+            await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, actor, JSON.stringify({ is_posted: 1 }), updated_at] });
 
             await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Posted failed:", e));
 
@@ -798,11 +806,16 @@ app.post("/api/telegram/webhook", async (req, res) => {
         }
 
         const t = nowISO();
-        const requester = cb.from.username ? `@${cb.from.username}` : (cb.from.first_name || 'Admin');
+        const requester = getTgActorName(cb.from);
 
         await db.execute({
           sql: "UPDATE items SET status = 'REQUEST_RETURN', updated_at = ? WHERE id = ?",
           args: [t, itemId2]
+        });
+
+        await db.execute({
+          sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)",
+          args: [itemId2, itemData.status, 'REQUEST_RETURN', requester, t]
         });
 
         await db.execute({
@@ -904,7 +917,13 @@ app.post("/api/telegram/webhook", async (req, res) => {
         }
 
         const t = nowISO();
-        const requester = cb.from.username ? `@${cb.from.username}` : (cb.from.first_name || 'Telegram user');
+        const requester = getTgActorName(cb.from);
+
+        // Cập nhật trạng thái item (nếu cần - hiện tại delete_requests không đổi status item ngay lập tức nhưng nên ghi log)
+        await db.execute({
+          sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)",
+          args: [itemId2, itemData.status, 'REQUEST_DELETE', requester, t]
+        });
 
         await db.execute({
           sql: "INSERT INTO delete_requests (item_id, requested_by, status, created_at) VALUES (?, ?, 'PENDING', ?)",
@@ -971,11 +990,18 @@ app.post("/api/telegram/webhook", async (req, res) => {
         if (!item) return res.sendStatus(200);
 
         const t = nowISO();
+        const actor = getTgActorName(cb.from);
 
         // 1. Cập nhật trạng thái sản phẩm
         await db.execute({
           sql: "UPDATE items SET status = 'RETURN', updated_at = ? WHERE id = ?",
           args: [t, item.id]
+        });
+
+        // Thêm log vào timeline
+        await db.execute({
+          sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)",
+          args: [item.id, item.status, 'RETURN', actor, t]
         });
 
         // 2. Cập nhật trạng thái yêu cầu
@@ -1036,11 +1062,18 @@ app.post("/api/telegram/webhook", async (req, res) => {
         }
 
         const t = nowISO();
+        const actor = getTgActorName(cb.from);
 
         // Soft-delete item
         await db.execute({
           sql: `UPDATE items SET is_deleted=1, status='DELETED', deleted_at=?, deleted_by=?, updated_at=? WHERE id=?`,
-          args: [t, cb.from.username || cb.from.first_name || 'TelegramBot', t, reqData.item_id]
+          args: [t, actor, t, reqData.item_id]
+        });
+
+        // Log timeline
+        await db.execute({
+          sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)",
+          args: [reqData.item_id, 'PENDING_DELETE', 'DELETED', actor, t]
         });
 
         // Update request status
@@ -1093,6 +1126,14 @@ app.post("/api/telegram/webhook", async (req, res) => {
         }
 
         const t = nowISO();
+        const actor = getTgActorName(cb.from);
+
+        // Log timeline
+        await db.execute({
+          sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)",
+          args: [reqData.item_id, 'REQUEST_DELETE', 'READY_TO_SHIP', actor, t]
+        });
+
         await db.execute({
           sql: `UPDATE delete_requests SET status='REJECTED', resolved_at=? WHERE id=?`,
           args: [t, reqId]
