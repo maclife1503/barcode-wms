@@ -361,11 +361,7 @@
                     ${r.is_posted ? '<span title="Đã đăng bán">🏷️</span> ' : ''}${esc(r.name)}
                   </td>
                   <td class="hide-mobile" style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
-                  <td>
-                    ${statusPill(r.status)}
-                    ${(currentUserRole === 'admin' && currentUserName === 'tho') ? `<button onclick="requestReturn(${r.id}, '${esc(r.name).replace(/'/g, String.fromCharCode(39))}')" title="Request return" style="background:none;border:1.5px solid #fdba74;color:#ea580c;border-radius:6px;padding:1px 6px;cursor:pointer;font-size:12px;margin-left:5px;vertical-align:middle">↩️</button>` : ''}
-                    <button onclick="requestDelete(${r.id}, '${esc(r.name).replace(/'/g, String.fromCharCode(39))}')" title="Request delete" style="background:none;border:1.5px solid #fca5a5;color:#ef4444;border-radius:6px;padding:1px 6px;cursor:pointer;font-size:12px;margin-left:5px;vertical-align:middle">🗑️</button>
-                  </td>
+                  <td>${statusPill(r.status)}</td>
                   <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status === 'IN_STOCK' ? '#dbeafe' : '#f1f5f9'}">${esc(r.inventory_status)}</span></td>
                   <td class="hide-mobile">${diff} ngày ${isStale ? '⚠️' : ''}</td>
                   <td class="hide-mobile" style="font-size:12px; color:var(--muted)">${fmtTime(r.updated_at)}</td>
