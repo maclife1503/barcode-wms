@@ -821,35 +821,45 @@ app.post("/api/telegram/webhook", async (req, res) => {
           `⏰ Thời gian: ${fmtTimeLocal(t)}`;
 
         const buttons = [
-          { text: "✅ Duyệt xóa", callback_data: `approve_delete:${newReqId}` },
-          { text: "❌ Từ chối", callback_data: `reject_delete:${newReqId}` }
+          { text: "✅ Done", callback_data: `return_done:${newReqId}` },
+          { text: `📍 ${itemData.status}`, callback_data: "none" }
         ];
 
-
-
         try {
+          // 1. Gửi tin nhắn tới nhóm Admin/Return
           const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ chat_id: returnGroupId, text: retMsg, parse_mode: "HTML", reply_markup: { inline_keyboard: [buttons] } })
           });
           const tgData = await tgRes.json();
+          let adminMsgId = null;
           if (tgData.ok && tgData.result) {
-            await db.execute({
-              sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
-              args: [String(tgData.result.chat.id), String(tgData.result.message_id), newReqId]
-            });
+            adminMsgId = String(tgData.result.message_id);
           }
 
+          // 2. Gửi tin nhắn tới nhóm Task
           const taskMsg = `📝 <b>TASK: KIỂM TRA HÀNG RETURN</b>\n\n` +
             `📦 ID: <code>${itemData.package_id}</code>\n` +
-            `🏷️ Tên: <b>${escTg(itemData.name)}</b>\n` +
+            `🏷 Tên: <b>${escTg(itemData.name)}</b>\n` +
             `🔢 Serial: <code>${itemData.serial_clean || "-"}</code>\n` +
             `👤 Người yêu cầu: ${escTg(requester)}`;
 
-          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          const taskRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ chat_id: taskGroupId, text: taskMsg, parse_mode: "HTML" })
           });
+          const taskData = await taskRes.json();
+          let taskMsgId = null;
+          if (taskData.ok && taskData.result) {
+            taskMsgId = String(taskData.result.message_id);
+          }
+
+          // 3. Cập nhật database với ID của cả 2 tin nhắn
+          await db.execute({
+            sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ?, task_chat_id = ?, task_msg_id = ? WHERE id = ?",
+            args: [returnGroupId, adminMsgId, taskGroupId, taskMsgId, newReqId]
+          });
+
         } catch (e) {
           console.error("Telegram request return failed:", e);
         }
@@ -940,6 +950,73 @@ app.post("/api/telegram/webhook", async (req, res) => {
         });
         return res.sendStatus(200);
       }
+
+      if (action === "return_done") {
+        const userId = String(cb.from.id);
+        if (userId !== "7818712996") {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "❌ Chỉ admin mới có quyền nhấn Done!", show_alert: true })
+          });
+          return res.sendStatus(200);
+        }
+
+        const reqId = itemId; // Doi voi return_done, itemId thuc chat la reqId
+        const { rows: reqRows } = await db.execute({ sql: "SELECT * FROM delete_requests WHERE id = ?", args: [reqId] });
+        const request = reqRows[0];
+        if (!request) return res.sendStatus(200);
+
+        const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [request.item_id] });
+        const item = itemRows[0];
+        if (!item) return res.sendStatus(200);
+
+        const t = nowISO();
+
+        // 1. Cập nhật trạng thái sản phẩm
+        await db.execute({
+          sql: "UPDATE items SET status = 'RETURN', updated_at = ? WHERE id = ?",
+          args: [t, item.id]
+        });
+
+        // 2. Cập nhật trạng thái yêu cầu
+        await db.execute({
+          sql: "UPDATE delete_requests SET status = 'DONE', resolved_at = ? WHERE id = ?",
+          args: [t, reqId]
+        });
+
+        // 3. Xóa tin nhắn bên nhóm Task (nếu có)
+        if (request.task_chat_id && request.task_msg_id) {
+          await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: request.task_chat_id, message_id: request.task_msg_id })
+          }).catch(e => console.error("Xóa task message thất bại:", e));
+        }
+
+        // 4. Cập nhật lại tin nhắn hiện tại
+        const newText = cb.message.text.replace("YÊU CẦU RETURN & XÓA", "✅ ĐÃ HOÀN TẤT RETURN") + `\n\n✅ Đã xử lý bởi: <b>${escTg(cb.from.first_name)}</b>`;
+        await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: cb.message.chat.id,
+            message_id: cb.message.message_id,
+            text: newText,
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [[{ text: "📍 RETURN", callback_data: "none" }]]
+            }
+          })
+        });
+
+        // 5. Đồng bộ nút bấm tin nhắn gốc
+        await syncTelegramButtons(item.id);
+
+        await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callback_query_id: cb.id, text: "✅ Đã xác nhận hoàn tất Return!" })
+        });
+        return res.sendStatus(200);
+      }
+
 
       if (action === "approve_delete") {
         const reqId = itemId;
