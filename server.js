@@ -679,7 +679,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         // Fallback for other users in the whitelist
         const authorizedUserIds = (process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
         if (authorizedUserIds.includes(userId)) {
-           allowed = true; 
+          allowed = true;
         }
       }
 
@@ -770,7 +770,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         const itemId2 = itemId;
         const { rows: iRows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ? AND is_deleted = 0", args: [itemId2] });
         const itemData = iRows[0];
-        
+
         if (!itemData) {
           await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -825,10 +825,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
           { text: "❌ Từ chối", callback_data: `reject_delete:${newReqId}` }
         ];
 
-        if (itemData.tg_chat_id && itemData.tg_msg_id) {
-          const chatStripped = String(itemData.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
-          buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${itemData.tg_msg_id}` });
-        }
+
 
         try {
           const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -917,10 +914,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
           { text: "❌ Từ chối", callback_data: `reject_delete:${newReqId}` }
         ];
 
-        if (itemData.tg_chat_id && itemData.tg_msg_id) {
-          const chatStripped = String(itemData.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
-          buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${itemData.tg_msg_id}` });
-        }
+
 
         const delMarkup = {
           inline_keyboard: [buttons]
@@ -1147,14 +1141,14 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
           // Format due time in Vietnam TZ
           const dueVN = new Date(dueMs + VN_OFFSET);
-          const dueStr = `${String(dueVN.getUTCHours()).padStart(2,"0")}:${String(dueVN.getUTCMinutes()).padStart(2,"0")}`;
+          const dueStr = `${String(dueVN.getUTCHours()).padStart(2, "0")}:${String(dueVN.getUTCMinutes()).padStart(2, "0")}`;
 
           await sendTelegramMessage(
             `⏰ <b>Đã đặt nhắc:</b> ${escTg(title)}\n🕐 Nhắc lúc: <b>${dueStr}</b>`,
             { inline_keyboard: [[{ text: "❌ Huỷ nhắc", callback_data: `task_cancel:${taskId}` }]] }
           );
         }
-      } catch(e) { console.error("Task creation failed:", e); }
+      } catch (e) { console.error("Task creation failed:", e); }
     }
   }
 
@@ -1178,7 +1172,7 @@ setInterval(async () => {
         inline_keyboard: [[
           { text: "✅ Xong", callback_data: `task_done:${task.id}` },
           { text: "⏰ +15p", callback_data: `task_snooze15:${task.id}` },
-          { text: "⏰ +1h",  callback_data: `task_snooze60:${task.id}` }
+          { text: "⏰ +1h", callback_data: `task_snooze60:${task.id}` }
         ]]
       };
 
@@ -1205,9 +1199,9 @@ setInterval(async () => {
           sql: "UPDATE tasks SET status='PENDING', due_at=?, remind_count=?, tg_msg_id=? WHERE id=?",
           args: [nextDue, count, newMsgId, task.id]
         });
-      } catch(e) { console.error("Reminder send failed:", e); }
+      } catch (e) { console.error("Reminder send failed:", e); }
     }
-  } catch(e) { console.error("Scheduler error:", e); }
+  } catch (e) { console.error("Scheduler error:", e); }
 }, 30000);
 
 
@@ -1755,7 +1749,7 @@ app.post("/api/external/mark-posted", async (req, res) => {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: DELETE_GROUP_CHAT_ID, text: msg, parse_mode: "HTML" })
       });
-    } catch(e) { console.error("TG notify mark-posted failed:", e); }
+    } catch (e) { console.error("TG notify mark-posted failed:", e); }
 
     res.json({ ok: true, message: `Marked as posted: ${item.package_id} — ${item.name} (${item.serial_clean})` });
   } catch (e) {
@@ -1991,7 +1985,7 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
     try {
       const targetChatId = DELETE_GROUP_CHAT_ID || "-1003710611209";
       const title = "🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>";
-      
+
       const msg = `${title}\n\n` +
         `📦 ID: <code>${item.package_id}</code>\n` +
         `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
@@ -2005,10 +1999,7 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
         { text: "❌ Từ chối", callback_data: `reject_delete:${reqId}` }
       ];
 
-      if (item.tg_chat_id && item.tg_msg_id) {
-        const chatStripped = String(item.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
-        buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${item.tg_msg_id}` });
-      }
+
 
       const tgRes = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
         method: "POST",
@@ -2021,7 +2012,7 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
         })
       });
       const tgData = await tgRes.json();
-      
+
       if (tgData.ok && tgData.result) {
         await db.execute({
           sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
@@ -2078,7 +2069,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
       const returnGroupId = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
       const taskGroupId = process.env.TASK_GROUP_CHAT_ID || returnGroupId;
       const title = "📦 <b>YÊU CẦU RETURN & XÓA</b>";
-      
+
       const msg = `${title}\n\n` +
         `📦 ID: <code>${item.package_id}</code>\n` +
         `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
@@ -2092,10 +2083,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
         { text: "❌ Từ chối", callback_data: `reject_delete:${reqId}` }
       ];
 
-      if (item.tg_chat_id && item.tg_msg_id) {
-        const chatStripped = String(item.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
-        buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${item.tg_msg_id}` });
-      }
+
 
       const tgRes = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
         method: "POST",
@@ -2108,7 +2096,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
         })
       });
       const tgData = await tgRes.json();
-      
+
       if (tgData.ok && tgData.result) {
         await db.execute({
           sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
@@ -2260,7 +2248,7 @@ async function syncTelegramButtons(itemId) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `${{ READY_TO_SHIP:'🟡', SHIPPED:'🟢', RETURN:'⚫', RETURNED:'⚫', CREATED:'⬜', REQUEST_RETURN:'🟠' }[item.status]||'⬜'} ${item.status}`, callback_data: "none" },
+          { text: `${{ READY_TO_SHIP: '🟡', SHIPPED: '🟢', RETURN: '⚫', RETURNED: '⚫', CREATED: '⬜', REQUEST_RETURN: '🟠' }[item.status] || '⬜'} ${item.status}`, callback_data: "none" },
           { text: "↩️", callback_data: `request_return_tg:${item.id}` },
           { text: "🗑️", callback_data: `request_delete_tg:${item.id}` }
         ],
