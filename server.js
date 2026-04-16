@@ -29,6 +29,8 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 
 // Group nhận yêu cầu xóa
 const DELETE_GROUP_CHAT_ID = process.env.DELETE_GROUP_CHAT_ID || "-1003710611209";
+const RETURN_GROUP_CHAT_ID = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
+const TASK_GROUP_CHAT_ID = process.env.TASK_GROUP_CHAT_ID || RETURN_GROUP_CHAT_ID;
 
 function sign(val) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(val).digest("hex");
@@ -655,7 +657,11 @@ app.post("/api/telegram/webhook", async (req, res) => {
   if (req.body.callback_query) {
     const cb = req.body.callback_query;
     const chatId = String(cb.message.chat.id);
-    const isFromAuthorizedChat = chatId === String(authorizedChatId) || chatId === String(DELETE_GROUP_CHAT_ID);
+    const isFromAuthorizedChat = 
+      chatId === String(authorizedChatId) || 
+      chatId === String(DELETE_GROUP_CHAT_ID) ||
+      chatId === String(RETURN_GROUP_CHAT_ID) ||
+      chatId === String(TASK_GROUP_CHAT_ID);
     if (!isFromAuthorizedChat) return res.sendStatus(200);
 
     const [action, itemId] = cb.data.split(":");
@@ -822,7 +828,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
         const buttons = [
           { text: "✅ Done", callback_data: `return_done:${newReqId}` },
-          { text: `📍 ${itemData.status}`, callback_data: "none" }
+          { text: `📍 REQUEST_RETURN`, callback_data: "none" }
         ];
 
         try {
@@ -952,15 +958,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
       }
 
       if (action === "return_done") {
-        const userId = String(cb.from.id);
-        if (userId !== "7818712996") {
-          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ callback_query_id: cb.id, text: "❌ Chỉ admin mới có quyền nhấn Done!", show_alert: true })
-          });
-          return res.sendStatus(200);
-        }
-
+        // userId va allowed da co san tu check o tren
+        // khong can check userId === "7818712996" nua vi allowed da bao gom AUTHORIZED_TELEGRAM_USER_IDS
+        
         const reqId = itemId; // Doi voi return_done, itemId thuc chat la reqId
         const { rows: reqRows } = await db.execute({ sql: "SELECT * FROM delete_requests WHERE id = ?", args: [reqId] });
         const request = reqRows[0];
