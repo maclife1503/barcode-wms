@@ -744,6 +744,20 @@ app.post("/api/telegram/webhook", async (req, res) => {
             await db.execute({ sql: "UPDATE items SET is_posted = 1, updated_at = ? WHERE id = ?", args: [updated_at, itemId] });
             await db.execute({ sql: "INSERT INTO edit_logs(item_id, actor, changes_json, created_at) VALUES(?,?,?,?)", args: [itemId, actor, JSON.stringify({ is_posted: 1 }), updated_at] });
 
+            // Xóa tin nhắn nhắc nhở unposted (nếu có)
+            if (item.post_task_msg_id && item.post_task_chat_id) {
+              const token = process.env.TELEGRAM_BOT_TOKEN;
+              await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: item.post_task_chat_id, message_id: item.post_task_msg_id })
+              }).catch(e => console.error("Delete unposted reminder failed:", e));
+
+              await db.execute({
+                sql: "UPDATE items SET post_task_msg_id = NULL, post_task_chat_id = NULL WHERE id = ?",
+                args: [itemId]
+              });
+            }
+
             await syncTelegramButtons(itemId).catch(e => console.error("Sync TG Posted failed:", e));
 
             // Trả lời Telegram kèm thông báo
@@ -1318,6 +1332,50 @@ setInterval(async () => {
           args: [nextDue, count, newMsgId, task.id]
         });
       } catch (e) { console.error("Reminder send failed:", e); }
+    }
+
+    // 2. Kiểm tra hàng chưa đăng bán quá 2 ngày
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const { rows: staleItems } = await db.execute({
+      sql: `SELECT * FROM items 
+            WHERE is_posted = 0 AND is_deleted = 0 
+            AND status IN ('CREATED', 'READY_TO_SHIP')
+            AND post_task_msg_id IS NULL 
+            AND created_at <= ?`,
+      args: [twoDaysAgo]
+    });
+
+    for (const item of staleItems) {
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      const taskChatId = process.env.TASK_GROUP_CHAT_ID || process.env.RETURN_GROUP_CHAT_ID;
+      if (!token || !taskChatId) continue;
+
+      const msg = `⚠️ <b>NHẮC NHỞ: CHƯA ĐĂNG BÁN (QUÁ 2 NGÀY)</b>\n\n` +
+        `📦 ID: <code>${item.package_id}</code>\n` +
+        `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
+        `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+        `📅 Ngày nhập: ${fmtTimeLocal(item.created_at)}\n\n` +
+        `👉 <i>Vui lòng kiểm tra và đăng bán sản phẩm này!</i>`;
+
+      const markup = {
+        inline_keyboard: [[
+          { text: "🔴 Post Meru Ngay", callback_data: `posted:${item.id}` }
+        ]]
+      };
+
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: taskChatId, text: msg, parse_mode: "HTML", reply_markup: markup })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          await db.execute({
+            sql: "UPDATE items SET post_task_msg_id = ?, post_task_chat_id = ? WHERE id = ?",
+            args: [String(data.result.message_id), String(taskChatId), item.id]
+          });
+        }
+      } catch (e) { console.error("Unposted reminder send failed:", e); }
     }
   } catch (e) { console.error("Scheduler error:", e); }
 }, 30000);

@@ -191,6 +191,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     await db.execute("ALTER TABLE delete_requests ADD COLUMN task_msg_id TEXT");
   } catch(e) { /* ignore */ }
 
+  // Migration: Thêm cột post_task_msg_id và post_task_chat_id vào items
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN post_task_msg_id TEXT");
+  } catch(e) { /* ignore */ }
+  try {
+    await db.execute("ALTER TABLE items ADD COLUMN post_task_chat_id TEXT");
+  } catch(e) { /* ignore */ }
+
   // Seed dữ liệu khởi tạo cho category_rules nếu bảng trống
   try {
     const { rows } = await db.execute("SELECT count(*) as count FROM category_rules");
