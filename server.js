@@ -826,7 +826,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         ];
 
         if (itemData.tg_chat_id && itemData.tg_msg_id) {
-          const chatStripped = itemData.tg_chat_id.replace("-100", "");
+          const chatStripped = String(itemData.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
           buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${itemData.tg_msg_id}` });
         }
 
@@ -904,7 +904,6 @@ app.post("/api/telegram/webhook", async (req, res) => {
         });
         const newReqId = newReqRows[0].id;
 
-        // Gửi yêu cầu vào group
         const delMsg = `🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>\n\n` +
           `📦 ID: <code>${itemData.package_id}</code>\n` +
           `🏷️ Tên: <b>${escTg(itemData.name)}</b>\n` +
@@ -913,11 +912,18 @@ app.post("/api/telegram/webhook", async (req, res) => {
           `👤 Yêu cầu bởi: <b>${escTg(requester)}</b>\n` +
           `⏰ Thời gian: ${fmtTimeLocal(t)}`;
 
+        const buttons = [
+          { text: "✅ Duyệt xóa", callback_data: `approve_delete:${newReqId}` },
+          { text: "❌ Từ chối", callback_data: `reject_delete:${newReqId}` }
+        ];
+
+        if (itemData.tg_chat_id && itemData.tg_msg_id) {
+          const chatStripped = String(itemData.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
+          buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${itemData.tg_msg_id}` });
+        }
+
         const delMarkup = {
-          inline_keyboard: [[
-            { text: "✅ Duyệt xóa", callback_data: `approve_delete:${newReqId}` },
-            { text: "❌ Từ chối", callback_data: `reject_delete:${newReqId}` }
-          ]]
+          inline_keyboard: [buttons]
         };
 
         try {
@@ -2000,7 +2006,7 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
       ];
 
       if (item.tg_chat_id && item.tg_msg_id) {
-        const chatStripped = item.tg_chat_id.replace("-100", "");
+        const chatStripped = String(item.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
         buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${item.tg_msg_id}` });
       }
 
@@ -2087,7 +2093,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
       ];
 
       if (item.tg_chat_id && item.tg_msg_id) {
-        const chatStripped = item.tg_chat_id.replace("-100", "");
+        const chatStripped = String(item.tg_chat_id).replace(/^-100/, "").replace(/^-/, "");
         buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${item.tg_msg_id}` });
       }
 
