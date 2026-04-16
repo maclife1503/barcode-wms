@@ -218,9 +218,9 @@ function getTgActorName(from) {
 }
 
 // ====== Telegram Alerts ======
-async function sendTelegramMessage(text) {
+async function sendTelegramMessage(text, targetChatId = null) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = targetChatId || process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
 
   try {
@@ -239,9 +239,9 @@ async function sendTelegramMessage(text) {
   }
 }
 
-async function sendTelegramDocument(filePath, caption = "") {
+async function sendTelegramDocument(filePath, caption = "", targetChatId = null) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = targetChatId || process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId || !fs.existsSync(filePath)) return;
 
   try {
