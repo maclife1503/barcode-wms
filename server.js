@@ -2254,7 +2254,8 @@ async function syncTelegramButtons(itemId) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `${{ READY_TO_SHIP:'🟡', SHIPPED:'🟢', RETURN:'⚫', RETURNED:'⚫', CREATED:'⬜' }[item.status]||'⬜'} ${item.status}`, callback_data: "none" },
+          { text: `${{ READY_TO_SHIP:'🟡', SHIPPED:'🟢', RETURN:'⚫', RETURNED:'⚫', CREATED:'⬜', REQUEST_RETURN:'🟠' }[item.status]||'⬜'} ${item.status}`, callback_data: "none" },
+          { text: "↩️", callback_data: `request_return_tg:${item.id}` },
           { text: "🗑️", callback_data: `request_delete_tg:${item.id}` }
         ],
         [
