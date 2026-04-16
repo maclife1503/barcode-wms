@@ -679,19 +679,27 @@ app.post("/api/telegram/webhook", async (req, res) => {
       const adminId = "7818712996";
       const userId = String(cb.from.id);
 
-      // Phân quyền chi tiết
+      // Phân quyền chi tiết theo yêu cầu mới
       let allowed = false;
 
+      // 1. Super Admin: Toàn quyền
       if (userId === adminId) {
-        allowed = true; // Admin có toàn quyền
-      } else if (bongId && userId === bongId) {
-        if (action === "posted") allowed = true;
-      } else if (aaronId && userId === aaronId) {
-        if (action === "request_delete_tg") allowed = true;
-      } else {
-        // Fallback for other users in the whitelist
-        const authorizedUserIds = (process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
-        if (authorizedUserIds.includes(userId)) {
+        allowed = true;
+      }
+      // 2. BONG: Chỉ được Post Meru
+      else if (bongId && userId === bongId) {
+        allowed = (action === "posted");
+      }
+      // 3. AARON: Chỉ được Yêu cầu xóa và Hoàn tất Return (Done)
+      else if (aaronId && userId === aaronId) {
+        allowed = (action === "request_delete_tg" || action === "return_done");
+      }
+      // 4. Nhóm Admin chung (AUTHORIZED_TELEGRAM_USER_IDS)
+      else if (authorizedUserIds.includes(userId)) {
+        // Toàn quyền trừ nút Hoàn tất Return (return_done)
+        if (action === "return_done") {
+          allowed = false;
+        } else {
           allowed = true;
         }
       }
