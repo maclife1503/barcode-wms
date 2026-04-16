@@ -1840,17 +1840,8 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
   }
 
   const t = nowISO();
-  const isAdmin = req.user === "tho";
 
-  // 1. Chỉ admin bấm thì mới đổi trạng thái thành REQUEST_RETURN
-  if (isAdmin) {
-    await db.execute({
-      sql: "UPDATE items SET status = 'REQUEST_RETURN', updated_at = ? WHERE id = ?",
-      args: [t, id]
-    });
-  }
-
-  // 2. Lưu yêu cầu vào database
+  // 1. Lưu yêu cầu xóa vào database
   await db.execute({
     sql: "INSERT INTO delete_requests (item_id, requested_by, status, created_at) VALUES (?, ?, 'PENDING', ?)",
     args: [id, req.user, t]
@@ -1862,24 +1853,18 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
   });
   const reqId = reqRows[0].id;
 
-  // 3. Gửi thông báo Telegram
+  // 2. Gửi thông báo Telegram (Yêu cầu xóa)
   const tgToken = process.env.TELEGRAM_BOT_TOKEN;
   if (tgToken) {
     try {
-      // Xác định mục tiêu: Admin -> Group Return, User 5447566156 -> Group Delete
-      const isReturnReq = isAdmin;
-      const targetChatId = isReturnReq ? "-1003767068395" : (DELETE_GROUP_CHAT_ID || "-1003710611209");
+      const targetChatId = DELETE_GROUP_CHAT_ID || "-1003710611209";
+      const title = "🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>";
       
-      const title = isReturnReq ? "📦 <b>YÊU CẦU RETURN & XÓA</b>" : "🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>";
-      const statusLine = isReturnReq 
-        ? `📍 Trạng thái: ${item.status} ➔ <b>REQUEST_RETURN</b>`
-        : `📍 Trạng thái: ${item.status}`;
-
       const msg = `${title}\n\n` +
         `📦 ID: <code>${item.package_id}</code>\n` +
         `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
         `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
-        `${statusLine}\n` +
+        `📍 Trạng thái: ${item.status}\n` +
         `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>\n` +
         `⏰ Thời gian: ${fmtTimeLocal(t)}`;
 
@@ -1911,24 +1896,108 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
           args: [String(tgData.result.chat.id), String(tgData.result.message_id), reqId]
         });
       }
+    } catch (e) {
+      console.error("Request-delete notify error:", e);
+    }
+  }
 
-      // Nếu là Admin, gửi thêm task
-      if (isAdmin) {
-        const taskMsg = `📝 <b>TASK: KIỂM TRA HÀNG RETURN</b>\n\n` +
-          `📦 ID: <code>${item.package_id}</code>\n` +
-          `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
-          `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
-          `👤 Người yêu cầu: ${escTg(req.user)}`;
+  res.json({ ok: true });
+});
 
-        await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: targetChatId, text: taskMsg, parse_mode: "HTML" })
+// ====== Request Return (Admin only) ======
+app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req, res) => {
+  const id = req.params.id;
+
+  const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ? AND is_deleted = 0", args: [id] });
+  const item = rows[0];
+  if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+
+  // Kiểm tra pending
+  const { rows: pendingRows } = await db.execute({
+    sql: "SELECT id FROM delete_requests WHERE item_id = ? AND status = 'PENDING'",
+    args: [id]
+  });
+  if (pendingRows[0]) return res.status(409).json({ error: "Đã có yêu cầu đang chờ duyệt cho sản phẩm này" });
+
+  const t = nowISO();
+
+  // 1. Đổi trạng thái thành REQUEST_RETURN
+  await db.execute({
+    sql: "UPDATE items SET status = 'REQUEST_RETURN', updated_at = ? WHERE id = ?",
+    args: [t, id]
+  });
+
+  // 2. Lưu yêu cầu vào DB
+  await db.execute({
+    sql: "INSERT INTO delete_requests (item_id, requested_by, status, created_at) VALUES (?, ?, 'PENDING', ?)",
+    args: [id, req.user, t]
+  });
+
+  const { rows: reqRows } = await db.execute({
+    sql: "SELECT id FROM delete_requests WHERE item_id = ? AND status = 'PENDING' ORDER BY id DESC LIMIT 1",
+    args: [id]
+  });
+  const reqId = reqRows[0].id;
+
+  // 3. Thông báo Telegram tới Group Return & Delete
+  const tgToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (tgToken) {
+    try {
+      const returnGroupId = "-1003767068395";
+      const title = "📦 <b>YÊU CẦU RETURN & XÓA</b>";
+      
+      const msg = `${title}\n\n` +
+        `📦 ID: <code>${item.package_id}</code>\n` +
+        `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
+        `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+        `📍 Trạng thái: ${item.status} ➔ <b>REQUEST_RETURN</b>\n` +
+        `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>\n` +
+        `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+
+      const buttons = [
+        { text: "✅ Duyệt xóa", callback_data: `approve_delete:${reqId}` },
+        { text: "❌ Từ chối", callback_data: `reject_delete:${reqId}` }
+      ];
+
+      if (item.tg_chat_id && item.tg_msg_id) {
+        const chatStripped = item.tg_chat_id.replace("-100", "");
+        buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${item.tg_msg_id}` });
+      }
+
+      const tgRes = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: returnGroupId,
+          text: msg,
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [buttons] }
+        })
+      });
+      const tgData = await tgRes.json();
+      
+      if (tgData.ok && tgData.result) {
+        await db.execute({
+          sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
+          args: [String(tgData.result.chat.id), String(tgData.result.message_id), reqId]
         });
       }
 
+      // Gửi task message
+      const taskMsg = `📝 <b>TASK: KIỂM TRA HÀNG RETURN</b>\n\n` +
+        `📦 ID: <code>${item.package_id}</code>\n` +
+        `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
+        `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+        `👤 Người yêu cầu: ${escTg(req.user)}`;
+
+      await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: returnGroupId, text: taskMsg, parse_mode: "HTML" })
+      });
+
     } catch (e) {
-      console.error("Request-delete notify error:", e);
+      console.error("Request-return notify error:", e);
     }
   }
 
