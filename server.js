@@ -810,7 +810,8 @@ app.post("/api/telegram/webhook", async (req, res) => {
         });
         const newReqId = newReqRows[0].id;
 
-        const returnGroupId = "-1003767068395";
+        const returnGroupId = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
+        const taskGroupId = process.env.TASK_GROUP_CHAT_ID || returnGroupId;
         const retMsg = `📦 <b>YÊU CẦU RETURN & XÓA</b>\n\n` +
           `📦 ID: <code>${itemData.package_id}</code>\n` +
           `🏷️ Tên: <b>${escTg(itemData.name)}</b>\n` +
@@ -850,7 +851,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
           await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: returnGroupId, text: taskMsg, parse_mode: "HTML" })
+            body: JSON.stringify({ chat_id: taskGroupId, text: taskMsg, parse_mode: "HTML" })
           });
         } catch (e) {
           console.error("Telegram request return failed:", e);
@@ -2068,7 +2069,8 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
   const tgToken = process.env.TELEGRAM_BOT_TOKEN;
   if (tgToken) {
     try {
-      const returnGroupId = "-1003767068395";
+      const returnGroupId = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
+      const taskGroupId = process.env.TASK_GROUP_CHAT_ID || returnGroupId;
       const title = "📦 <b>YÊU CẦU RETURN & XÓA</b>";
       
       const msg = `${title}\n\n` +
@@ -2118,7 +2120,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
       await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: returnGroupId, text: taskMsg, parse_mode: "HTML" })
+        body: JSON.stringify({ chat_id: taskGroupId, text: taskMsg, parse_mode: "HTML" })
       });
 
     } catch (e) {
