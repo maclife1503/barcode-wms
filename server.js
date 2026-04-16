@@ -1102,9 +1102,9 @@ function buildItemQuery(req) {
   } else if (tab === 'shipped') {
     where.push(`status = 'SHIPPED'`);
   } else if (tab === 'return') {
-    where.push(`status IN ('HENBIN', 'RETURNED', 'RETURN')`);
+    where.push(`status IN ('HENBIN', 'RETURNED', 'RETURN', 'REQUEST_RETURN')`);
   } else if (tab === 'not_posted') {
-    where.push(`is_posted = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN', 'RETURN')`);
+    where.push(`is_posted = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN', 'RETURN', 'REQUEST_RETURN')`);
   } else if (status) {
     where.push(`status = ?`);
     params.push(status);
@@ -1436,7 +1436,7 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   const { id } = req.params;
   const { to_status } = req.body;
 
-  const allowed = new Set(["READY_TO_SHIP", "SHIPPED", "RETURN", "CREATED"]);
+  const allowed = new Set(["READY_TO_SHIP", "SHIPPED", "RETURN", "CREATED", "REQUEST_RETURN"]);
   if (!allowed.has(to_status)) return res.status(400).json({ error: "Invalid status" });
 
   const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
@@ -1840,7 +1840,17 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
   }
 
   const t = nowISO();
+  const isAdmin = req.user === "tho";
 
+  // 1. Chỉ admin bấm thì mới đổi trạng thái thành REQUEST_RETURN
+  if (isAdmin) {
+    await db.execute({
+      sql: "UPDATE items SET status = 'REQUEST_RETURN', updated_at = ? WHERE id = ?",
+      args: [t, id]
+    });
+  }
+
+  // 2. Lưu yêu cầu vào database
   await db.execute({
     sql: "INSERT INTO delete_requests (item_id, requested_by, status, created_at) VALUES (?, ?, 'PENDING', ?)",
     args: [id, req.user, t]
@@ -1852,44 +1862,73 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
   });
   const reqId = reqRows[0].id;
 
-  // Gửi thông báo Telegram tới group
+  // 3. Gửi thông báo Telegram
   const tgToken = process.env.TELEGRAM_BOT_TOKEN;
   if (tgToken) {
-    const msg = `🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>\n\n` +
-      `📦 ID: <code>${item.package_id}</code>\n` +
-      `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
-      `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
-      `📍 Trạng thái: ${item.status}\n` +
-      `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>\n` +
-      `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+    try {
+      // Xác định mục tiêu: Admin -> Group Return, User 5447566156 -> Group Delete
+      const isReturnReq = isAdmin;
+      const targetChatId = isReturnReq ? "-1003767068395" : (DELETE_GROUP_CHAT_ID || "-1003710611209");
+      
+      const title = isReturnReq ? "📦 <b>YÊU CẦU RETURN & XÓA</b>" : "🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>";
+      const statusLine = isReturnReq 
+        ? `📍 Trạng thái: ${item.status} ➔ <b>REQUEST_RETURN</b>`
+        : `📍 Trạng thái: ${item.status}`;
 
-    const replyMarkup = {
-      inline_keyboard: [[
+      const msg = `${title}\n\n` +
+        `📦 ID: <code>${item.package_id}</code>\n` +
+        `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
+        `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+        `${statusLine}\n` +
+        `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>\n` +
+        `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+
+      const buttons = [
         { text: "✅ Duyệt xóa", callback_data: `approve_delete:${reqId}` },
         { text: "❌ Từ chối", callback_data: `reject_delete:${reqId}` }
-      ]]
-    };
+      ];
 
-    try {
+      if (item.tg_chat_id && item.tg_msg_id) {
+        const chatStripped = item.tg_chat_id.replace("-100", "");
+        buttons.push({ text: "🔍 Xem tin nhắn gốc", url: `https://t.me/c/${chatStripped}/${item.tg_msg_id}` });
+      }
+
       const tgRes = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chat_id: DELETE_GROUP_CHAT_ID,
+          chat_id: targetChatId,
           text: msg,
           parse_mode: "HTML",
-          reply_markup: replyMarkup
+          reply_markup: { inline_keyboard: [buttons] }
         })
       });
       const tgData = await tgRes.json();
+      
       if (tgData.ok && tgData.result) {
         await db.execute({
           sql: "UPDATE delete_requests SET tg_chat_id = ?, tg_msg_id = ? WHERE id = ?",
           args: [String(tgData.result.chat.id), String(tgData.result.message_id), reqId]
         });
       }
+
+      // Nếu là Admin, gửi thêm task
+      if (isAdmin) {
+        const taskMsg = `📝 <b>TASK: KIỂM TRA HÀNG RETURN</b>\n\n` +
+          `📦 ID: <code>${item.package_id}</code>\n` +
+          `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
+          `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
+          `👤 Người yêu cầu: ${escTg(req.user)}`;
+
+        await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: targetChatId, text: taskMsg, parse_mode: "HTML" })
+        });
+      }
+
     } catch (e) {
-      console.error("Send delete request to Telegram failed:", e);
+      console.error("Request-delete notify error:", e);
     }
   }
 

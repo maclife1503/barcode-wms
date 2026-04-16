@@ -109,13 +109,14 @@
       }[m]));
     }
 
-    const STATUS_ICON  = { READY_TO_SHIP:'🟡', SHIPPED:'🟢', RETURN:'⚫', RETURNED:'⚫', CREATED:'⬜' };
+    const STATUS_ICON  = { READY_TO_SHIP:'🟡', SHIPPED:'🟢', RETURN:'⚫', RETURNED:'⚫', CREATED:'⬜', REQUEST_RETURN:'🟠' };
     const STATUS_STYLE = {
       READY_TO_SHIP: 'background:#fef9c3; color:#854d0e',
       SHIPPED:       'background:#dcfce7; color:#166534',
       RETURN:        'background:#f1f5f9; color:#64748b',
       RETURNED:      'background:#f1f5f9; color:#64748b',
-      CREATED:       'background:#f1f5f9; color:var(--text)'
+      CREATED:       'background:#f1f5f9; color:var(--text)',
+      REQUEST_RETURN:'background:#ffedd5; color:#9a3412'
     };
     function statusPill(status) {
       const icon  = STATUS_ICON[status]  || '❓';
@@ -324,7 +325,7 @@
             <tbody>
               ${items.map(r => {
           let diff = 0;
-          if (r.status === 'RETURN') {
+          if (r.status === 'RETURN' || r.status === 'REQUEST_RETURN') {
             diff = 0;
           } else if (r.status === 'SHIPPED' && r.shipped_at) {
             diff = Math.ceil((new Date(r.shipped_at) - new Date(r.created_at)) / (86400000));
