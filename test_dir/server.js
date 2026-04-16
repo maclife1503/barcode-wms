@@ -232,7 +232,7 @@ async function sendTelegramMessage(text) {
 
 async function sendTelegramDocument(filePath, caption = "") {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = String(process.env.TELEGRAM_CHAT_ID);
   if (!token || !chatId || !fs.existsSync(filePath)) return;
 
   try {
@@ -268,7 +268,7 @@ async function sendTelegramDocument(filePath, caption = "") {
 
 async function sendTelegramPhoto(imageBuffer, caption = "", replyMarkup = null) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = String(process.env.TELEGRAM_CHAT_ID);
   if (!token || !chatId) return;
 
   try {
