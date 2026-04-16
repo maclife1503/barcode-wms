@@ -31,6 +31,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 const DELETE_GROUP_CHAT_ID = process.env.DELETE_GROUP_CHAT_ID || "-1003710611209";
 const RETURN_GROUP_CHAT_ID = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
 const TASK_GROUP_CHAT_ID = process.env.TASK_GROUP_CHAT_ID || RETURN_GROUP_CHAT_ID;
+const NOTIFICATION_GROUP_CHAT_ID = process.env.NOTIFICATION_GROUP_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
 
 function sign(val) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(val).digest("hex");
@@ -424,7 +425,7 @@ async function checkStaleItemsAndNotify(isManual = false) {
     });
     msg += `\n👉 <a href="${process.env.APP_URL || ''}/list.html">Xem danh sách đầy đủ</a>`;
 
-    await sendTelegramMessage(msg);
+    await sendTelegramMessage(msg, NOTIFICATION_GROUP_CHAT_ID);
 
     // Lưu lại ngày đã gửi
     await db.execute({
@@ -1095,6 +1096,14 @@ app.post("/api/telegram/webhook", async (req, res) => {
           sql: `UPDATE delete_requests SET status='APPROVED', resolved_at=? WHERE id=?`,
           args: [t, reqId]
         });
+
+        // Thông báo hệ thống
+        const notifyMsg = `🔔 <b>HỆ THỐNG: ĐÃ XÓA SẢN PHẨM</b>\n\n` +
+          `📦 ID: <code>${reqData.package_id}</code>\n` +
+          `🏷 Tên: <b>${escTg(reqData.name)}</b>\n` +
+          `👤 Duyệt bởi: <b>${escTg(actor)}</b>\n` +
+          `⏰ Thời gian: ${fmtTimeLocal(t)}`;
+        await sendTelegramMessage(notifyMsg, NOTIFICATION_GROUP_CHAT_ID);
 
         // Xóa tin nhắn gốc của item trên Telegram (nếu có)
         if (reqData.item_tg_chat && reqData.item_tg_msg) {
@@ -2327,12 +2336,12 @@ app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) =>
   });
 
   // Gửi thông báo Telegram
-  const msg = `🗑️ <b>SẢN PHẨM ĐÃ BỊ XÓA</b>\n\n` +
-    `📦 Mã: <code>${item.package_id}</code>\n` +
-    `🏷️ Tên: ${item.name}\n` +
-    `👤 Người xóa: ${req.user}\n` +
+  const msg = `🔔 <b>HỆ THỐNG: ĐÃ XÓA SẢN PHẨM (TỪ WEB)</b>\n\n` +
+    `📦 ID: <code>${item.package_id}</code>\n` +
+    `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
+    `👤 Người xóa: <b>${escTg(req.user)}</b>\n` +
     `⏰ Thời gian: ${fmtTimeLocal(t)}`;
-  sendTelegramMessage(msg).catch(e => console.error("Notify delete failed:", e));
+  await sendTelegramMessage(msg, NOTIFICATION_GROUP_CHAT_ID);
 
   res.json({ ok: true });
 });
