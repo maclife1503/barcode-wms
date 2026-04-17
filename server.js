@@ -625,12 +625,11 @@ app.post("/api/external/create", async (req, res) => {
       inline_keyboard: [
         [
           { text: `🟡 READY_TO_SHIP`, callback_data: "none" },
-          { text: "↩️", callback_data: `request_return_tg:${newItem.id}` },
-          { text: "🗑️", callback_data: `request_delete_tg:${newItem.id}` }
+          { text: "↩️", callback_data: `request_return_tg:${newItem.id}` }
         ],
         [
-          { text: "📁 Copy", callback_data: `copy_item:${newItem.id}` },
           { text: "🔴 Post", callback_data: `posted:${newItem.id}` },
+          { text: "🗑️", callback_data: `request_delete_tg:${newItem.id}` },
           { text: "🔴 Log", callback_data: `meru:${newItem.id}` }
         ]
       ]
@@ -2490,14 +2489,13 @@ async function syncTelegramButtons(itemId) {
       inline_keyboard: [
         [
           { text: `${{ READY_TO_SHIP: '🟡', SHIPPED: '🟢', RETURN: '⚫', RETURNED: '⚫', CREATED: '⬜', REQUEST_RETURN: '🟠' }[item.status] || '⬜'} ${item.status}`, callback_data: "none" },
-          { text: "↩️", callback_data: `request_return_tg:${item.id}` },
-          { text: "🗑️", callback_data: `request_delete_tg:${item.id}` }
+          { text: "↩️", callback_data: `request_return_tg:${item.id}` }
         ],
         [
-          { text: "📁 Copy", callback_data: `copy_item:${item.id}` },
           item.is_posted
             ? { text: "🟢 Posted", callback_data: `posted:${item.id}` }
             : { text: "🔴 Post", callback_data: `posted:${item.id}` },
+          { text: "🗑️", callback_data: `request_delete_tg:${item.id}` },
           item.is_meru_logged
             ? { text: "🟢 Logged", callback_data: `meru:${item.id}` }
             : { text: "🔴 Log", callback_data: `meru:${item.id}` }
