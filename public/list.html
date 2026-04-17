@@ -308,20 +308,29 @@
       dashHtml += `</div>`;
       dashEl.innerHTML = dashHtml;
 
+      // Filter by category if selected
+      let displayRows = cachedData.rows;
+      if (selectedCategory) {
+        displayRows = displayRows.filter(item => (item.category || 'else') === selectedCategory);
+      }
+
       // Grouping
       const groups = {};
-      cachedData.rows.forEach(item => {
-        const cat = item.category || 'else';
+      const shouldGroup = !(currentTab === 'shipped' || currentTab === 'return');
+
+      displayRows.forEach(item => {
+        const cat = shouldGroup ? (item.category || 'else') : 'Danh sách sản phẩm';
         if (!groups[cat]) groups[cat] = [];
         groups[cat].push(item);
       });
 
       let tablesHtml = "";
-      const sortedCats = Object.keys(groups).sort((a, b) => (a === 'else' ? 1 : b === 'else' ? -1 : a.localeCompare(b)));
+      const sortedCats = Object.keys(groups).sort((a, b) => {
+        if (!shouldGroup) return 0;
+        return (a === 'else' ? 1 : b === 'else' ? -1 : a.localeCompare(b));
+      });
 
       sortedCats.forEach(cat => {
-        if (selectedCategory && cat !== selectedCategory) return;
-
         const items = groups[cat];
         tablesHtml += `
       <h3 style="margin: 24px 0 12px; display:flex; align-items:center; gap:10px; text-transform:capitalize">
