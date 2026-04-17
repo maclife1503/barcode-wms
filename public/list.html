@@ -398,13 +398,26 @@
       const statusEl = document.getElementById("status");
       const inventoryEl = document.getElementById("inventory");
 
-      // Khôi phục state
-      qEl.value = sessionStorage.getItem("list_q") || "";
-      statusEl.value = sessionStorage.getItem("list_status") || "";
-      inventoryEl.value = sessionStorage.getItem("list_inventory") || "";
-      document.getElementById("posted").value = sessionStorage.getItem("list_posted") || "";
-      currentTab = sessionStorage.getItem("list_tab") || "stock";
-      selectedCategory = sessionStorage.getItem("list_category") || null;
+      // Kiểm tra xem là load mới hay là F5 / Back
+      let isReloadOrBack = false;
+      const navEntries = performance.getEntriesByType("navigation");
+      if (navEntries.length > 0) {
+        isReloadOrBack = navEntries[0].type === "reload" || navEntries[0].type === "back_forward";
+      } else if (window.performance && window.performance.navigation) {
+        isReloadOrBack = window.performance.navigation.type === 1 || window.performance.navigation.type === 2;
+      }
+
+      // Khôi phục state chỉ khi F5 hoặc Back
+      if (isReloadOrBack) {
+        qEl.value = sessionStorage.getItem("list_q") || "";
+        statusEl.value = sessionStorage.getItem("list_status") || "";
+        inventoryEl.value = sessionStorage.getItem("list_inventory") || "";
+        document.getElementById("posted").value = sessionStorage.getItem("list_posted") || "";
+        currentTab = sessionStorage.getItem("list_tab") || "stock";
+        selectedCategory = sessionStorage.getItem("list_category") || null;
+      } else {
+        currentTab = "stock";
+      }
 
       // Cập nhật giao diện tab active
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
