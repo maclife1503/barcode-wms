@@ -524,7 +524,7 @@ app.post("/api/items", requireAuth, requireStaff, async (req, res) => {
           status, inventory_status,
           created_at, updated_at,
           is_deleted, created_by, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', 'UNKNOWN', ?, ?, 0, ?, ?)
       `,
         args: [
           package_id, token,
@@ -591,7 +591,7 @@ app.post("/api/external/create", async (req, res) => {
         INSERT INTO items (
           package_id, token, name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
           status, inventory_status, created_at, updated_at, is_deleted, created_by, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY_TO_SHIP', 'UNKNOWN', ?, ?, 0, 'shortcut', ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', 'UNKNOWN', ?, ?, 0, 'shortcut', ?)
       `,
       args: [
         package_id, token, fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
@@ -624,7 +624,7 @@ app.post("/api/external/create", async (req, res) => {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `🟡 READY_TO_SHIP`, callback_data: "none" },
+          { text: `⬜ CREATED`, callback_data: "none" },
           { text: "↩️", callback_data: `request_return_tg:${newItem.id}` }
         ],
         [
