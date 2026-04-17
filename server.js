@@ -401,7 +401,7 @@ async function checkStaleItemsAndNotify(isManual = false) {
     if (rows[0]?.value === today) return;
   }
 
-  // Tìm hàng tồn > 15 ngày (READY_TO_SHIP hoặc CREATED)
+  // Tìm hàng tồn > 15 ngày (CREATED)
   // Tính 15 ngày trước từ giờ Nhật Bản
   const staleDate = new Date(new Date().getTime() + 9 * 60 * 60 * 1000 - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -410,7 +410,7 @@ async function checkStaleItemsAndNotify(isManual = false) {
       SELECT package_id, name, created_at
       FROM items
       WHERE is_deleted = 0
-        AND status = 'READY_TO_SHIP'
+        AND status = 'CREATED'
         AND substr(created_at, 1, 10) < ?
       ORDER BY created_at ASC
       LIMIT 20
@@ -1193,7 +1193,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         // Log timeline
         await db.execute({
           sql: "INSERT INTO status_logs(item_id, from_status, to_status, actor, created_at) VALUES(?,?,?,?,?)",
-          args: [reqData.item_id, 'REQUEST_DELETE', 'READY_TO_SHIP', actor, t]
+          args: [reqData.item_id, 'REQUEST_DELETE', 'CREATED', actor, t]
         });
 
         await db.execute({
@@ -1390,7 +1390,7 @@ setInterval(async () => {
       const { rows: staleItems } = await db.execute({
         sql: `SELECT * FROM items 
               WHERE is_posted = 0 AND is_deleted = 0 
-              AND status IN ('CREATED', 'READY_TO_SHIP')
+              AND status = 'CREATED'
               AND post_task_msg_id IS NULL 
               AND created_at <= ?`,
         args: [twoDaysAgo]
@@ -1454,7 +1454,7 @@ function buildItemQuery(req) {
   }
 
   if (tab === 'stock') {
-    where.push(`status IN ('READY_TO_SHIP', 'CREATED')`);
+    where.push(`status = 'CREATED'`);
   } else if (tab === 'shipped') {
     where.push(`status = 'SHIPPED'`);
   } else if (tab === 'return') {
@@ -1792,7 +1792,7 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   const { id } = req.params;
   const { to_status } = req.body;
 
-  const allowed = new Set(["READY_TO_SHIP", "SHIPPED", "RETURN", "CREATED", "REQUEST_RETURN"]);
+  const allowed = new Set(["SHIPPED", "RETURN", "CREATED", "REQUEST_RETURN"]);
   if (!allowed.has(to_status)) return res.status(400).json({ error: "Invalid status" });
 
   const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
@@ -2488,7 +2488,7 @@ async function syncTelegramButtons(itemId) {
     const replyMarkup = {
       inline_keyboard: [
         [
-          { text: `${{ READY_TO_SHIP: '🟡', SHIPPED: '🟢', RETURN: '⚫', RETURNED: '⚫', CREATED: '⬜', REQUEST_RETURN: '🟠' }[item.status] || '⬜'} ${item.status}`, callback_data: "none" },
+          { text: `${{ SHIPPED: '🟢', RETURN: '⚫', RETURNED: '⚫', CREATED: '🟡', REQUEST_RETURN: '🟠' }[item.status] || '⬜'} ${item.status}`, callback_data: "none" },
           { text: "↩️", callback_data: `request_return_tg:${item.id}` }
         ],
         [

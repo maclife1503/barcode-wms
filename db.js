@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS items (
   coverage TEXT,
   tracking_code TEXT,
 
-  status TEXT NOT NULL DEFAULT 'CREATED', -- CREATED | READY_TO_SHIP | SHIPPED | RETURN
+  status TEXT NOT NULL DEFAULT 'CREATED', -- CREATED | SHIPPED | RETURN
   inventory_status TEXT NOT NULL DEFAULT 'UNKNOWN', -- UNKNOWN | IN_STOCK | NOT_IN_STOCK
   last_inventory_at TEXT,
   last_inventory_by TEXT,
@@ -219,6 +219,13 @@ CREATE TABLE IF NOT EXISTS tasks (
       }
     }
   } catch(e) { console.error("Seeding categories failed:", e); }
+
+  // Migration: Gộp trạng thái READY_TO_SHIP thành CREATED
+  try {
+    await db.execute("UPDATE items SET status = 'CREATED' WHERE status = 'READY_TO_SHIP'");
+    await db.execute("UPDATE status_logs SET to_status = 'CREATED' WHERE to_status = 'READY_TO_SHIP'");
+    await db.execute("UPDATE status_logs SET from_status = 'CREATED' WHERE from_status = 'READY_TO_SHIP'");
+  } catch(e) { console.error("Merge READY_TO_SHIP failed:", e); }
 }
 
 initDb().catch(console.error);
