@@ -723,22 +723,20 @@ app.post("/api/telegram/webhook", async (req, res) => {
         const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
         const item = rows[0];
         if (item) {
-          try {
-            const json = JSON.stringify(item, null, 2);
-            const fileName = `item_${item.package_id || itemId}.json`;
-            const filePath = path.join(__dirname, fileName);
-            fs.writeFileSync(filePath, json);
+          const textToCopy = 
+            `Name: ${item.name || "-"}\n` +
+            `Serial: ${item.serial_clean || "-"}\n` +
+            `Coverage: ${item.coverage || "-"}\n` +
+            `Battery: ${item.battery || "-"}\n` +
+            `Condition: ${item.condition || "-"}\n` +
+            `Note: ${item.note || "-"}`;
 
-            await sendTelegramDocument(filePath, `📦 Dữ liệu gốc: ${item.package_id || ""}`, cb.message.chat.id);
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-            await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ callback_query_id: cb.id, text: "✅ Đã gửi file JSON!" })
-            });
-          } catch (err) {
-            console.error("Copy JSON failed:", err);
-          }
+          await sendTelegramMessage(`📋 <b>Thông tin sản phẩm (Chạm để copy):</b>\n\n<code>${escTg(textToCopy)}</code>`, cb.message.chat.id);
+          
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: cb.id, text: "✅ Đã gửi thông tin copy!" })
+          });
         }
         return res.sendStatus(200);
       }
