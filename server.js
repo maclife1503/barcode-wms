@@ -569,19 +569,17 @@ app.post("/api/external/create", async (req, res) => {
       coverage: (req.body.coverage ?? "").trim(),
     };
 
-    fields.serial_clean = (fields.serial_raw.match(/[A-Z0-9]{6,}/i)?.[0] ?? "").trim();
+    fields.serial_clean = (fields.serial_raw.match(/[A-Z0-9]{4,}/i)?.[0] ?? "").trim();
 
-    if (!fields.name || !fields.serial_clean) {
-      return res.status(400).json({ error: "Thiếu tên sản phẩm hoặc serial hợp lệ." });
-    }
-
-    // Check duplicate
-    const { rows: existRows } = await db.execute({
-      sql: `SELECT package_id FROM items WHERE serial_clean = ? AND is_deleted = 0 LIMIT 1`,
-      args: [fields.serial_clean]
-    });
-    if (existRows[0]) {
-      return res.status(409).json({ error: "Sản phẩm đã tồn tại.", package_id: existRows[0].package_id });
+    // Loại bỏ kiểm tra điều kiện (validation) theo yêu cầu người dùng
+    if (fields.serial_clean) {
+      const { rows: existRows } = await db.execute({
+        sql: `SELECT package_id FROM items WHERE serial_clean = ? AND is_deleted = 0 LIMIT 1`,
+        args: [fields.serial_clean]
+      });
+      if (existRows[0]) {
+        return res.status(409).json({ error: "Sản phẩm đã tồn tại.", package_id: existRows[0].package_id });
+      }
     }
 
     const package_id = await nextPackageId();
@@ -669,8 +667,8 @@ app.post("/api/telegram/webhook", async (req, res) => {
   if (req.body.callback_query) {
     const cb = req.body.callback_query;
     const chatId = String(cb.message.chat.id);
-    const isFromAuthorizedChat = 
-      chatId === String(authorizedChatId) || 
+    const isFromAuthorizedChat =
+      chatId === String(authorizedChatId) ||
       chatId === String(DELETE_GROUP_CHAT_ID) ||
       chatId === String(RETURN_GROUP_CHAT_ID) ||
       chatId === String(TASK_GROUP_CHAT_ID);
@@ -727,7 +725,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
         const item = rows[0];
         if (item) {
-          const textToCopy = 
+          const textToCopy =
             `Name: ${item.name || "-"}\n` +
             `Serial: ${item.serial_clean || "-"}\n` +
             `Coverage: ${item.coverage || "-"}\n` +
@@ -736,7 +734,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
             `Note: ${item.note || "-"}`;
 
           await sendTelegramMessage(`📋 <b>Thông tin sản phẩm (Chạm để copy):</b>\n\n<code>${escTg(textToCopy)}</code>`, cb.message.chat.id);
-          
+
           await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ callback_query_id: cb.id, text: "✅ Đã gửi thông tin copy!" })
@@ -1036,7 +1034,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
       if (action === "return_done") {
         // userId va allowed da co san tu check o tren
         // khong can check userId === "7818712996" nua vi allowed da bao gom AUTHORIZED_TELEGRAM_USER_IDS
-        
+
         const reqId = itemId; // Doi voi return_done, itemId thuc chat la reqId
         const { rows: reqRows } = await db.execute({ sql: "SELECT * FROM delete_requests WHERE id = ?", args: [reqId] });
         const request = reqRows[0];
@@ -2476,7 +2474,7 @@ async function syncTelegramButtons(itemId) {
       mvd: item.mvd || "",
       name: item.name || "",
       serial: item.serial_clean || "",
-      condition: item.condition || "" ,
+      condition: item.condition || "",
       battery: item.battery || "",
       coverage: item.coverage || "",
       note: item.note || ""
