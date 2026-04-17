@@ -627,8 +627,9 @@ app.post("/api/external/create", async (req, res) => {
           { text: "🗑️", callback_data: `request_delete_tg:${newItem.id}` }
         ],
         [
-          { text: "🔴 Post Meru", callback_data: `posted:${newItem.id}` },
-          { text: "🔴 Log Meru", callback_data: `meru:${newItem.id}` }
+          { text: "📁 Copy", callback_data: `copy_item:${newItem.id}` },
+          { text: "🔴 Post", callback_data: `posted:${newItem.id}` },
+          { text: "🔴 Log", callback_data: `meru:${newItem.id}` }
         ]
       ]
     };
@@ -715,6 +716,30 @@ app.post("/api/telegram/webhook", async (req, res) => {
             show_alert: true
           })
         });
+        return res.sendStatus(200);
+      }
+
+      if (action === "copy_item") {
+        const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [itemId] });
+        const item = rows[0];
+        if (item) {
+          try {
+            const json = JSON.stringify(item, null, 2);
+            const fileName = `item_${item.package_id || itemId}.json`;
+            const filePath = path.join(__dirname, fileName);
+            fs.writeFileSync(filePath, json);
+
+            await sendTelegramDocument(filePath, `📦 Dữ liệu gốc: ${item.package_id || ""}`, cb.message.chat.id);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+            await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ callback_query_id: cb.id, text: "✅ Đã gửi file JSON!" })
+            });
+          } catch (err) {
+            console.error("Copy JSON failed:", err);
+          }
+        }
         return res.sendStatus(200);
       }
 
@@ -1387,7 +1412,7 @@ setInterval(async () => {
 
         const markup = {
           inline_keyboard: [[
-            { text: "🔴 Post Meru Ngay", callback_data: `posted:${item.id}` }
+            { text: "🔴 Post Ngay", callback_data: `posted:${item.id}` }
           ]]
         };
 
@@ -2464,12 +2489,13 @@ async function syncTelegramButtons(itemId) {
           { text: "🗑️", callback_data: `request_delete_tg:${item.id}` }
         ],
         [
+          { text: "📁 Copy", callback_data: `copy_item:${item.id}` },
           item.is_posted
             ? { text: "🟢 Posted", callback_data: `posted:${item.id}` }
-            : { text: "🔴 Post Meru", callback_data: `posted:${item.id}` },
+            : { text: "🔴 Post", callback_data: `posted:${item.id}` },
           item.is_meru_logged
             ? { text: "🟢 Logged", callback_data: `meru:${item.id}` }
-            : { text: "🔴 Log Meru", callback_data: `meru:${item.id}` }
+            : { text: "🔴 Log", callback_data: `meru:${item.id}` }
         ]
       ]
     };
