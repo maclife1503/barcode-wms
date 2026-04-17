@@ -247,6 +247,15 @@
         u.searchParams.set("status", statusEl.value);
       }
 
+      // Save state
+      sessionStorage.setItem("list_q", qEl.value);
+      sessionStorage.setItem("list_status", statusEl.value);
+      sessionStorage.setItem("list_inventory", inventoryEl.value);
+      sessionStorage.setItem("list_posted", postedEl.value);
+      sessionStorage.setItem("list_tab", currentTab);
+      if (selectedCategory) sessionStorage.setItem("list_category", selectedCategory);
+      else sessionStorage.removeItem("list_category");
+
       const r = await fetch(u);
       cachedData = await r.json();
       render();
@@ -388,6 +397,19 @@
       const qEl = document.getElementById("q");
       const statusEl = document.getElementById("status");
       const inventoryEl = document.getElementById("inventory");
+
+      // Khôi phục state
+      qEl.value = sessionStorage.getItem("list_q") || "";
+      statusEl.value = sessionStorage.getItem("list_status") || "";
+      inventoryEl.value = sessionStorage.getItem("list_inventory") || "";
+      document.getElementById("posted").value = sessionStorage.getItem("list_posted") || "";
+      currentTab = sessionStorage.getItem("list_tab") || "stock";
+      selectedCategory = sessionStorage.getItem("list_category") || null;
+
+      // Cập nhật giao diện tab active
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeTab = document.getElementById(`tab-${currentTab}`);
+      if (activeTab) activeTab.classList.add('active');
 
       let debounceTimer = null;
       qEl.addEventListener("input", () => {
