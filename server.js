@@ -21,15 +21,17 @@ app.use(cookieParser());
 // ====== Simple auth (đủ dùng nội bộ) ======
 const USERS = {
   [process.env.ADMIN_USER]: { passwordHash: process.env.ADMIN_PASS, role: "admin" },
-  [process.env.STAFF_USER]: { passwordHash: process.env.STAFF_PASS, role: "staff" },
-  "bong": { passwordHash: "$2b$10$55BPxlmk/nq6fW9WV9mkFuYD/pdyiHl5gPaV.3CEco/xKcB6.VYVG", role: "entry" },
+  [process.env.STAFF_USER]: { passwordHash: process.env.STAFF_PASS, role: "staff" }
 };
+if (process.env.BONG_USER && process.env.BONG_PASS_HASH) {
+  USERS[process.env.BONG_USER] = { passwordHash: process.env.BONG_PASS_HASH, role: "entry" };
+}
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 
 // Group nhận yêu cầu xóa
-const DELETE_GROUP_CHAT_ID = process.env.DELETE_GROUP_CHAT_ID || "-1003710611209";
-const RETURN_GROUP_CHAT_ID = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
+const DELETE_GROUP_CHAT_ID = process.env.DELETE_GROUP_CHAT_ID;
+const RETURN_GROUP_CHAT_ID = process.env.RETURN_GROUP_CHAT_ID;
 const TASK_GROUP_CHAT_ID = process.env.TASK_GROUP_CHAT_ID || RETURN_GROUP_CHAT_ID;
 const NOTIFICATION_GROUP_CHAT_ID = process.env.NOTIFICATION_GROUP_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
 
@@ -67,7 +69,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 function requireSuperAdmin(req, res, next) {
-  if (req.role !== "admin" || req.user !== "tho") return res.status(403).json({ error: "Tho Admin only" });
+  if (req.role !== "admin" || req.user !== (process.env.SUPER_ADMIN_USER || process.env.ADMIN_USER)) return res.status(403).json({ error: "Tho Admin only" });
   next();
 }
 function requireStaff(req, res, next) {
@@ -678,7 +680,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
       // Kiểm tra quyền hạn người dùng theo rule mới
       const bongId = String(process.env.TELEGRAM_BONG || "").trim();
       const aaronId = String(process.env.TELEGRAM_AARON || "").trim();
-      const adminId = "7818712996";
+      const adminId = String(process.env.TELEGRAM_ADMIN_ID || "").trim();
       const userId = String(cb.from.id);
 
       // Phân quyền chi tiết theo yêu cầu mới
@@ -820,7 +822,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
       }
       if (action === "request_return_tg") {
         const userId = String(cb.from.id);
-        if (userId !== "7818712996") {
+        if (userId !== String(process.env.TELEGRAM_ADMIN_ID || "").trim()) {
           await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ callback_query_id: cb.id, text: "❌ Chỉ admin mới có quyền yêu cầu Return!", show_alert: true })
@@ -876,7 +878,7 @@ app.post("/api/telegram/webhook", async (req, res) => {
         });
         const newReqId = newReqRows[0].id;
 
-        const returnGroupId = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
+        const returnGroupId = process.env.RETURN_GROUP_CHAT_ID;
         const taskGroupId = process.env.TASK_GROUP_CHAT_ID || returnGroupId;
         const tagAaron = process.env.TELEGRAM_AARON ? `\n🔔 Tag: <a href="tg://user?id=${process.env.TELEGRAM_AARON}">@AARON</a>` : "";
         const retMsg = `📦 <b>YÊU CẦU RETURN & XÓA</b>\n\n` +
@@ -2213,7 +2215,7 @@ app.post("/api/items/:id/request-delete", requireAuth, async (req, res) => {
   const tgToken = process.env.TELEGRAM_BOT_TOKEN;
   if (tgToken) {
     try {
-      const targetChatId = DELETE_GROUP_CHAT_ID || "-1003710611209";
+      const targetChatId = DELETE_GROUP_CHAT_ID;
       const title = "🗑️ <b>YÊU CẦU XÓA SẢN PHẨM</b>";
 
       const msg = `${title}\n\n` +
@@ -2296,7 +2298,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
   const tgToken = process.env.TELEGRAM_BOT_TOKEN;
   if (tgToken) {
     try {
-      const returnGroupId = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
+      const returnGroupId = process.env.RETURN_GROUP_CHAT_ID;
       const taskGroupId = process.env.TASK_GROUP_CHAT_ID || returnGroupId;
       const title = "📦 <b>YÊU CẦU RETURN & XÓA</b>";
 
