@@ -868,6 +868,11 @@ app.post("/api/telegram/webhook", async (req, res) => {
           { text: `📍 REQUEST_RETURN`, callback_data: "none" }
         ];
 
+        if (itemData.tg_chat_id && itemData.tg_msg_id) {
+          const cleanChatId = String(itemData.tg_chat_id).replace("-100", "");
+          buttons.push({ text: "🔗 Xem tin gốc", url: `https://t.me/c/${cleanChatId}/${itemData.tg_msg_id}` });
+        }
+
         try {
           // 1. Gửi tin nhắn tới nhóm Admin/Return
           const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -2283,6 +2288,11 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
         { text: "✅ Duyệt xóa", callback_data: `approve_delete:${reqId}` },
         { text: "❌ Từ chối", callback_data: `reject_delete:${reqId}` }
       ];
+
+      if (item.tg_chat_id && item.tg_msg_id) {
+        const cleanChatId = String(item.tg_chat_id).replace("-100", "");
+        buttons.push({ text: "🔗 Xem tin gốc", url: `https://t.me/c/${cleanChatId}/${item.tg_msg_id}` });
+      }
 
 
 
