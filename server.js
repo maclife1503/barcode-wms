@@ -608,12 +608,16 @@ app.post("/api/external/create", async (req, res) => {
     const qrBuffer = await QRCode.toBuffer(token, { margin: 1, width: 400, errorCorrectionLevel: 'L' });
     const labelBuffer = await generateLabelBuffer(fields, qrBuffer);
 
-    let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
-      `📦 ID: <code>${package_id}</code>\n` +
-      `🏷 Tên: <b>${escTg(fields.name)}</b>\n` +
-      `🔢 Serial: <code>${fields.serial_clean}</code>\n` +
-      `💎 Tình trạng: ${escTg(fields.condition)}\n` +
-      `📅 Ngày tạo: ${fmtTimeLocal(t)}`;
+    const captionData = {
+      mvd: fields.mvd || "",
+      name: fields.name || "",
+      serial: fields.serial_clean || "",
+      condition: fields.condition || "",
+      battery: fields.battery || "",
+      coverage: fields.coverage || "",
+      note: fields.note || ""
+    };
+    let caption = `<code>${JSON.stringify(captionData)}</code>`;
 
     if (process.env.APP_URL) {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/scan.html?token=${token}">Xem chi tiết</a>`;
@@ -2468,11 +2472,16 @@ async function syncTelegramButtons(itemId) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
 
     // 1. Quay lai Caption don gian
-    let caption = `📌 <b>ITEM MỚI (SHORTCUT)</b>\n\n` +
-      `📦 ID: <code>${item.package_id}</code>\n` +
-      `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
-      `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
-      `📅 Ngày tạo: ${fmtTimeLocal(item.created_at)}`;
+    const captionData = {
+      mvd: item.mvd || "",
+      name: item.name || "",
+      serial: item.serial_clean || "",
+      condition: item.condition || "" ,
+      battery: item.battery || "",
+      coverage: item.coverage || "",
+      note: item.note || ""
+    };
+    let caption = `<code>${JSON.stringify(captionData)}</code>`;
 
     if (process.env.APP_URL) {
       caption += `\n\n🔗 <a href="${process.env.APP_URL}/item.html?id=${item.id}">Xem chi tiết trên Web</a>`;
