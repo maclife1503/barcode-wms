@@ -854,12 +854,13 @@ app.post("/api/telegram/webhook", async (req, res) => {
 
         const returnGroupId = process.env.RETURN_GROUP_CHAT_ID || "-1003767068395";
         const taskGroupId = process.env.TASK_GROUP_CHAT_ID || returnGroupId;
+        const tagAaron = process.env.TELEGRAM_AARON ? `\n🔔 Tag: <a href="tg://user?id=${process.env.TELEGRAM_AARON}">@AARON</a>` : "";
         const retMsg = `📦 <b>YÊU CẦU RETURN & XÓA</b>\n\n` +
           `📦 ID: <code>${itemData.package_id}</code>\n` +
           `🏷️ Tên: <b>${escTg(itemData.name)}</b>\n` +
           `🔢 Serial: <code>${itemData.serial_clean || "-"}</code>\n` +
           `📍 Trạng thái: ${itemData.status} ➔ <b>REQUEST_RETURN</b>\n` +
-          `👤 Yêu cầu bởi: <b>${escTg(requester)}</b>\n` +
+          `👤 Yêu cầu bởi: <b>${escTg(requester)}</b>${tagAaron}\n` +
           `⏰ Thời gian: ${fmtTimeLocal(t)}`;
 
         const buttons = [
@@ -884,7 +885,8 @@ app.post("/api/telegram/webhook", async (req, res) => {
             `📦 ID: <code>${itemData.package_id}</code>\n` +
             `🏷 Tên: <b>${escTg(itemData.name)}</b>\n` +
             `🔢 Serial: <code>${itemData.serial_clean || "-"}</code>\n` +
-            `👤 Người yêu cầu: ${escTg(requester)}`;
+            `👤 Người yêu cầu: ${escTg(requester)}` +
+            (process.env.TELEGRAM_AARON ? `\n🔔 Tag: <a href="tg://user?id=${process.env.TELEGRAM_AARON}">@AARON</a>` : "");
 
           const taskRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -1371,6 +1373,7 @@ setInterval(async () => {
         if (!token || !taskChatId) continue;
 
         const msg = `⚠️ <b>NHẮC NHỞ: CHƯA ĐĂNG BÁN (QUÁ 2 NGÀY)</b>\n\n` +
+          `🔔 Tag: <a href="tg://user?id=${process.env.TELEGRAM_BONG || ''}">@BONG</a>\n\n` +
           `📦 ID: <code>${item.package_id}</code>\n` +
           `🏷 Tên: <b>${escTg(item.name)}</b>\n` +
           `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
@@ -2273,7 +2276,7 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
         `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
         `🔢 Serial: <code>${item.serial_clean || "-"}</code>\n` +
         `📍 Trạng thái: ${item.status} ➔ <b>REQUEST_RETURN</b>\n` +
-        `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>\n` +
+        `👤 Yêu cầu bởi: <b>${escTg(req.user)}</b>` + (process.env.TELEGRAM_AARON ? `\n🔔 Tag: <a href="tg://user?id=${process.env.TELEGRAM_AARON}">@AARON</a>` : "") + `\n` +
         `⏰ Thời gian: ${fmtTimeLocal(t)}`;
 
       const buttons = [
