@@ -680,7 +680,10 @@ app.post("/api/telegram/webhook", async (req, res) => {
       // Kiểm tra quyền hạn người dùng theo rule mới
       const bongId = String(process.env.TELEGRAM_BONG || "").trim();
       const aaronId = String(process.env.TELEGRAM_AARON || "").trim();
-      const adminId = String(process.env.TELEGRAM_ADMIN_ID || "").trim();
+      // Nếu không có TELEGRAM_ADMIN_ID riêng, lấy ID đầu tiên trong mảng AUTHORIZED_TELEGRAM_USER_IDS làm Super Admin
+      const adminId = process.env.TELEGRAM_ADMIN_ID 
+                      ? String(process.env.TELEGRAM_ADMIN_ID).trim() 
+                      : String(process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(',')[0].trim();
       const userId = String(cb.from.id);
 
       // Phân quyền chi tiết theo yêu cầu mới
@@ -822,7 +825,11 @@ app.post("/api/telegram/webhook", async (req, res) => {
       }
       if (action === "request_return_tg") {
         const userId = String(cb.from.id);
-        if (userId !== String(process.env.TELEGRAM_ADMIN_ID || "").trim()) {
+        const adminId = process.env.TELEGRAM_ADMIN_ID 
+                        ? String(process.env.TELEGRAM_ADMIN_ID).trim() 
+                        : String(process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(',')[0].trim();
+
+        if (userId !== adminId) {
           await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ callback_query_id: cb.id, text: "❌ Chỉ admin mới có quyền yêu cầu Return!", show_alert: true })
