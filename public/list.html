@@ -372,12 +372,17 @@
           <table cellpadding="12">
             <thead>
               <tr>
-                <th style="width:110px">Package</th>
+                ${isShippedOrReturn ? `
+                  <th style="width:130px">Updated</th>
+                  <th style="width:110px">Package</th>
+                ` : `
+                  <th style="width:110px">Package</th>
+                `}
                 <th style="width:250px">Name</th>
                 <th class="hide-mobile" style="width:160px">Serial</th>
                 <th class="hide-mobile" style="width:120px">Inventory</th>
                 <th class="hide-mobile" style="width:100px">Stock</th>
-                <th style="width:160px">Updated</th>
+                ${!isShippedOrReturn ? `<th style="width:160px">Updated</th>` : ""}
               </tr>
             </thead>
             <tbody>
@@ -391,16 +396,25 @@
             diff = Math.ceil((new Date() - new Date(r.created_at)) / (86400000));
           }
           const isStale = (r.status === 'CREATED') && diff > 15;
+          const timeStr = isShippedOrReturn 
+            ? (r.updated_at ? r.updated_at.substring(0, 10) : "-")
+            : fmtTime(r.updated_at);
+
           return `
                 <tr style="${isStale ? 'background:#fff1f2' : ''}">
-                  <td style="font-weight:600"><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
+                  ${isShippedOrReturn ? `
+                    <td style="font-size:12px; color:var(--muted); font-weight:600">${timeStr}</td>
+                    <td style="font-weight:600"><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
+                  ` : `
+                    <td style="font-weight:600"><a href="/item.html?id=${r.id}">${esc(r.package_id)}</a></td>
+                  `}
                   <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(r.name)}">
                     ${r.is_posted ? '<span title="Đã đăng bán">🏷️</span> ' : ''}${esc(r.name)}
                   </td>
                   <td class="hide-mobile" style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
                   <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status === 'IN_STOCK' ? '#dbeafe' : '#f1f5f9'}">${esc(r.inventory_status)}</span></td>
                   <td class="hide-mobile">${diff} ngày ${isStale ? '⚠️' : ''}</td>
-                  <td style="font-size:12px; color:var(--muted)">${fmtTime(r.updated_at)}</td>
+                  ${!isShippedOrReturn ? `<td style="font-size:12px; color:var(--muted)">${timeStr}</td>` : ""}
                 </tr>
               `}).join("")}
             </tbody>
