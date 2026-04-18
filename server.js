@@ -8,8 +8,21 @@ const cookieParser = require("cookie-parser");
 const QRCode = require("qrcode");
 const crypto = require("crypto");
 const FormData = require("form-data");
-const { createCanvas, loadImage } = require("canvas");
+const { createCanvas, loadImage, registerFont } = require("canvas");
 const db = require("./db");
+
+// Đăng ký Font tiếng Nhật để vẽ Tem nhãn chính xác
+try {
+  const fontPath = path.join(__dirname, 'fonts', 'NotoSansJP-Bold.ttf');
+  if (fs.existsSync(fontPath)) {
+    registerFont(fontPath, { family: 'Noto Sans JP' });
+    console.log("✅ Registered Japanese Font (Noto Sans JP)");
+  } else {
+    console.warn("⚠️ Font file not found, Japanese characters might be broken.");
+  }
+} catch (e) {
+  console.error("❌ Failed to register font:", e);
+}
 
 const app = express();
 
@@ -360,20 +373,20 @@ async function generateLabelBuffer(item, qrBuffer) {
   ctx.fillStyle = "#000";
 
   // MVD
-  ctx.font = "bold 34px sans-serif";
+  ctx.font = "bold 34px 'Noto Sans JP'";
   let y = pad + 38;
   ctx.fillText(String(item.mvd || "-").trim(), leftX, y);
 
   // Serial
   y += 24;
-  ctx.font = "bold 18px sans-serif";
+  ctx.font = "bold 18px 'Noto Sans JP'";
   let sn = (item.serial_clean || item.serial_raw || "-").trim();
   while (ctx.measureText(sn).width > textW && sn.length > 4) { sn = sn.slice(0, -2) + "…"; }
   ctx.fillText(sn, leftX, y);
 
   // Name
   y += 26;
-  ctx.font = "bold 20px sans-serif";
+  ctx.font = "bold 20px 'Noto Sans JP'";
   wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 24, 10);
 
   // Logo
