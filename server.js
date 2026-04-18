@@ -2420,7 +2420,10 @@ app.post("/api/items/:id/request-return", requireAuth, requireAdmin, async (req,
 
 app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) => {
   const id = req.params.id;
-  const { rows } = await db.execute({ sql: "SELECT id, package_id, name FROM items WHERE id=?", args: [id] });
+  const { rows } = await db.execute({ 
+    sql: "SELECT id, package_id, name, tg_chat_id, tg_msg_id, post_task_msg_id FROM items WHERE id=?", 
+    args: [id] 
+  });
   const item = rows[0];
   if (!item) return res.status(404).json({ error: "Not found" });
 
@@ -2438,13 +2441,39 @@ app.post("/api/items/:id/delete", requireAuth, requireAdmin, async (req, res) =>
     args: [t, req.user, t, id]
   });
 
-  // Gửi thông báo Telegram
+  // Gửi thông báo Telegram về việc đã xóa
   const msg = `🔔 <b>HỆ THỐNG: ĐÃ XÓA SẢN PHẨM (TỪ WEB)</b>\n\n` +
     `📦 ID: <code>${item.package_id}</code>\n` +
     `🏷️ Tên: <b>${escTg(item.name)}</b>\n` +
     `👤 Người xóa: <b>${escTg(req.user)}</b>\n` +
     `⏰ Thời gian: ${fmtTimeLocal(t)}`;
   await sendTelegramMessage(msg, NOTIFICATION_GROUP_CHAT_ID);
+
+  // Xóa tin nhắn gốc trên Telegram (nếu có)
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (botToken) {
+    // 1. Xóa tin nhắn tạo hàng ban đầu
+    if (item.tg_chat_id && item.tg_msg_id) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: item.tg_chat_id, message_id: Number(item.tg_msg_id) })
+        });
+      } catch (e) { console.error("Xóa tin nhắn gốc TG lỗi:", e.message); }
+    }
+    // 2. Xóa tin nhắn nhắc nhở/task (nếu có)
+    if (item.post_task_msg_id) {
+      const taskChatId = process.env.TASK_GROUP_CHAT_ID || process.env.RETURN_GROUP_CHAT_ID;
+      if (taskChatId) {
+        try {
+          await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: taskChatId, message_id: Number(item.post_task_msg_id) })
+          });
+        } catch (e) { console.error("Xóa tin nhắn task TG lỗi:", e.message); }
+      }
+    }
+  }
 
   res.json({ ok: true });
 });
