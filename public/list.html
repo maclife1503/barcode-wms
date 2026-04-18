@@ -398,7 +398,7 @@
       const statusEl = document.getElementById("status");
       const inventoryEl = document.getElementById("inventory");
 
-      // Kiểm tra xem là load mới hay là F5 / Back
+      // Kiểm tra xem là load mới hay là F5 / Back / Quay lại từ trang Detail
       let isReloadOrBack = false;
       const navEntries = performance.getEntriesByType("navigation");
       if (navEntries.length > 0) {
@@ -407,8 +407,10 @@
         isReloadOrBack = window.performance.navigation.type === 1 || window.performance.navigation.type === 2;
       }
 
-      // Khôi phục state chỉ khi F5 hoặc Back
-      if (isReloadOrBack) {
+      const isFromDetail = document.referrer.includes("item.html");
+
+      // Khôi phục state chỉ khi F5, Back hoặc quay lại từ trang chi tiết
+      if (isReloadOrBack || isFromDetail) {
         qEl.value = sessionStorage.getItem("list_q") || "";
         statusEl.value = sessionStorage.getItem("list_status") || "";
         inventoryEl.value = sessionStorage.getItem("list_inventory") || "";
