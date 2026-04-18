@@ -328,22 +328,32 @@ async function sendTelegramPhoto(imageBuffer, caption = "", replyMarkup = null) 
 
 // ====== Image Label Generation (Mirror Frontend) ======
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
-  const words = (text || "").split(/\s+/).filter(Boolean);
-  let line = "";
+  if (!text) return y;
+  
   let lines = 0;
-  for (let i = 0; i < words.length; i++) {
-    const test = line ? (line + " " + words[i]) : words[i];
-    if (ctx.measureText(test).width <= maxWidth) {
-      line = test;
-    } else {
-      ctx.fillText(line, x, y);
+  let currentLine = "";
+  
+  // Duyệt qua từng ký tự để hỗ trợ các ngôn ngữ không có dấu cách như tiếng Nhật
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const testLine = currentLine + char;
+    const metrics = ctx.measureText(testLine);
+    
+    if (metrics.width > maxWidth && currentLine.length > 0) {
+      ctx.fillText(currentLine, x, y);
       y += lineHeight;
       lines++;
       if (maxLines && lines >= maxLines) return y;
-      line = words[i];
+      currentLine = char;
+    } else {
+      currentLine = testLine;
     }
   }
-  if (line) { ctx.fillText(line, x, y); y += lineHeight; }
+  
+  if (currentLine) {
+    ctx.fillText(currentLine, x, y);
+    y += lineHeight;
+  }
   return y;
 }
 
