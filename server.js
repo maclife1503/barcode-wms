@@ -329,16 +329,16 @@ async function sendTelegramPhoto(imageBuffer, caption = "", replyMarkup = null) 
 // ====== Image Label Generation (Mirror Frontend) ======
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
   if (!text) return y;
-  
+
   let lines = 0;
   let currentLine = "";
-  
+
   // Duyệt qua từng ký tự để hỗ trợ các ngôn ngữ không có dấu cách như tiếng Nhật
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     const testLine = currentLine + char;
     const metrics = ctx.measureText(testLine);
-    
+
     if (metrics.width > maxWidth && currentLine.length > 0) {
       ctx.fillText(currentLine, x, y);
       y += lineHeight;
@@ -349,7 +349,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
       currentLine = testLine;
     }
   }
-  
+
   if (currentLine) {
     ctx.fillText(currentLine, x, y);
     y += lineHeight;
@@ -384,20 +384,20 @@ async function generateLabelBuffer(item, qrBuffer) {
 
   // MVD
   ctx.font = "bold 34px 'Noto Sans JP'";
-  let y = pad + 38;
+  let y = pad + 40;
   ctx.fillText(String(item.mvd || "-").trim(), leftX, y);
 
   // Serial
-  y += 24;
+  y += 28;
   ctx.font = "bold 18px 'Noto Sans JP'";
   let sn = (item.serial_clean || item.serial_raw || "-").trim();
   while (ctx.measureText(sn).width > textW && sn.length > 4) { sn = sn.slice(0, -2) + "…"; }
   ctx.fillText(sn, leftX, y);
 
   // Name
-  y += 26;
+  y += 30;
   ctx.font = "bold 20px 'Noto Sans JP'";
-  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 24, 10);
+  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 28, 7);
 
   // Logo
   try {
@@ -704,9 +704,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
       const bongId = String(process.env.TELEGRAM_BONG || "").trim();
       const aaronId = String(process.env.TELEGRAM_AARON || "").trim();
       // Nếu không có TELEGRAM_ADMIN_ID riêng, lấy ID đầu tiên trong mảng AUTHORIZED_TELEGRAM_USER_IDS làm Super Admin
-      const adminId = process.env.TELEGRAM_ADMIN_ID 
-                      ? String(process.env.TELEGRAM_ADMIN_ID).trim() 
-                      : String(process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(',')[0].trim();
+      const adminId = process.env.TELEGRAM_ADMIN_ID
+        ? String(process.env.TELEGRAM_ADMIN_ID).trim()
+        : String(process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(',')[0].trim();
       const userId = String(cb.from.id);
 
       // Phân quyền chi tiết theo yêu cầu mới
@@ -848,9 +848,9 @@ app.post("/api/telegram/webhook", async (req, res) => {
       }
       if (action === "request_return_tg") {
         const userId = String(cb.from.id);
-        const adminId = process.env.TELEGRAM_ADMIN_ID 
-                        ? String(process.env.TELEGRAM_ADMIN_ID).trim() 
-                        : String(process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(',')[0].trim();
+        const adminId = process.env.TELEGRAM_ADMIN_ID
+          ? String(process.env.TELEGRAM_ADMIN_ID).trim()
+          : String(process.env.AUTHORIZED_TELEGRAM_USER_IDS || "").split(',')[0].trim();
 
         if (userId !== adminId) {
           await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {

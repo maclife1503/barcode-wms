@@ -1,5 +1,6 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -14,6 +15,7 @@
       border-left: 2px solid var(--border);
       margin-left: 12px;
     }
+
     .timeline-item::before {
       content: "";
       position: absolute;
@@ -26,24 +28,29 @@
       border: 2px solid white;
       box-shadow: 0 0 0 2px var(--primary-light);
     }
+
     .timeline-item:last-child {
       border-left: 2px solid transparent;
       padding-bottom: 0;
     }
+
     .timeline-time {
       font-size: 12px;
       font-weight: 600;
       color: var(--muted);
       margin-bottom: 4px;
     }
+
     .timeline-content {
       font-size: 14px;
       color: var(--text);
     }
+
     .timeline-actor {
       font-weight: 700;
       color: var(--primary);
     }
+
     .changes-tag {
       display: inline-block;
       font-size: 11px;
@@ -55,18 +62,20 @@
       margin-top: 6px;
       margin-right: 6px;
     }
-    
+
     .detail-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 16px;
       margin-top: 16px;
     }
+
     .detail-item {
       padding: 12px;
       background: var(--bg);
       border-radius: 12px;
     }
+
     .detail-label {
       font-size: 11px;
       text-transform: uppercase;
@@ -75,6 +84,7 @@
       margin-bottom: 4px;
       font-weight: 700;
     }
+
     .detail-value {
       font-size: 15px;
       font-weight: 600;
@@ -82,6 +92,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="no-print topbar">
     <div class="nav">
@@ -108,121 +119,131 @@
     </div>
   </div>
 
-<script>
-const LABEL_W = 548; const LABEL_H = 338;
-function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines){
-  const words = (text || "").split(/\s+/).filter(Boolean);
-  let line = ""; let lines = 0;
-  for (let i = 0; i < words.length; i++) {
-    const test = line ? (line + " " + words[i]) : words[i];
-    if (ctx.measureText(test).width <= maxWidth) { line = test; }
-    else { ctx.fillText(line, x, y); y += lineHeight; lines++; if (maxLines && lines >= maxLines) return y; line = words[i]; }
-  }
-  if (line) { ctx.fillText(line, x, y); y += lineHeight; }
-  return y;
-}
-function loadImage(src){
-  return new Promise((resolve, reject)=>{
-    const img = new Image(); img.onload = ()=> resolve(img); img.onerror = ()=> reject(new Error("Fail"));
-    if (/^https?:\/\//i.test(src)) img.crossOrigin = "anonymous";
-    img.src = src;
-  });
-}
-async function makeLabelPng({ mvd, serial, name, qrDataUrl, logoUrl = "/images/logo.png" }) {
-  const canvas = document.createElement("canvas"); canvas.width = LABEL_W; canvas.height = LABEL_H;
-  const ctx = canvas.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, LABEL_W, LABEL_H);
-  const pad = 7; const qrSize = 326; const qrX = LABEL_W - pad - qrSize;
-  const qrImg = await loadImage(qrDataUrl); ctx.imageSmoothingEnabled = false; ctx.drawImage(qrImg, qrX, pad, qrSize, qrSize);
-  ctx.save(); ctx.beginPath(); ctx.rect(pad, pad, qrX - 12, LABEL_H - pad*2); ctx.clip();
-  ctx.fillStyle = "#000"; ctx.font = "800 34px system-ui"; ctx.fillText(String(mvd||"-"), pad, pad + 38);
-  ctx.font = "700 18px system-ui"; let sn = (serial||"-"); while (ctx.measureText(sn).width > qrX-12 && sn.length > 4) sn = sn.slice(0, -2) + "…";
-  ctx.fillText(sn, pad, pad + 62); ctx.font = "700 20px system-ui"; wrapText(ctx, (name||"-"), pad, pad + 88, qrX-12, 24, 10);
-  ctx.restore();
-  try { const logoImg = await loadImage(logoUrl); ctx.imageSmoothingEnabled = true; const scale = Math.min((qrX-12)/logoImg.width, 140/logoImg.height);
-    const dw = logoImg.width*scale; const dh = logoImg.height*scale; ctx.drawImage(logoImg, pad + ((qrX-12)-dw)/2, LABEL_H-pad-dh, dw, dh);
-  } catch(e){}
-  return canvas.toDataURL("image/png");
-}
+  <script>
+    const LABEL_W = 548; const LABEL_H = 338;
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      if (!text) return y;
+      let lines = 0;
+      let currentLine = "";
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const testLine = currentLine + char;
+        if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
+          ctx.fillText(currentLine, x, y);
+          y += lineHeight;
+          lines++;
+          if (maxLines && lines >= maxLines) return y;
+          currentLine = char;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) { ctx.fillText(currentLine, x, y); y += lineHeight; }
+      return y;
+    }
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error("Fail"));
+        if (/^https?:\/\//i.test(src)) img.crossOrigin = "anonymous";
+        img.src = src;
+      });
+    }
+    async function makeLabelPng({ mvd, serial, name, qrDataUrl, logoUrl = "/images/logo.png" }) {
+      const canvas = document.createElement("canvas"); canvas.width = LABEL_W; canvas.height = LABEL_H;
+      const ctx = canvas.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, LABEL_W, LABEL_H);
+      const pad = 7; const qrSize = 326; const qrX = LABEL_W - pad - qrSize;
+      const qrImg = await loadImage(qrDataUrl); ctx.imageSmoothingEnabled = false; ctx.drawImage(qrImg, qrX, pad, qrSize, qrSize);
+      ctx.save(); ctx.beginPath(); ctx.rect(pad, pad, qrX - 12, LABEL_H - pad * 2); ctx.clip();
+      ctx.fillStyle = "#000"; ctx.font = "bold 34px system-ui"; ctx.fillText(String(mvd || "-"), pad, pad + 40);
+      ctx.font = "bold 18px system-ui"; let sn = (serial || "-"); while (ctx.measureText(sn).width > qrX - 12 && sn.length > 4) sn = sn.slice(0, -2) + "…";
+      ctx.fillText(sn, pad, pad + 68); ctx.font = "bold 20px system-ui"; wrapText(ctx, (name || "-"), pad, pad + 98, qrX - 12, 28, 7);
+      ctx.restore();
+      try {
+        const logoImg = await loadImage(logoUrl); ctx.imageSmoothingEnabled = true; const scale = Math.min((qrX - 12) / logoImg.width, 140 / logoImg.height);
+        const dw = logoImg.width * scale; const dh = logoImg.height * scale; ctx.drawImage(logoImg, pad + ((qrX - 12) - dw) / 2, LABEL_H - pad - dh, dw, dh);
+      } catch (e) { }
+      return canvas.toDataURL("image/png");
+    }
 
-function esc(s){ return (s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-function fmtTime(s) { if (!s) return "-"; try { return new Date(s).toLocaleString(); } catch(e) { return s; } }
-async function logout(){ await fetch("/api/logout",{method:"POST"}); location.href="/login.html"; }
-async function checkAdmin() {
-  const r = await fetch("/api/me"); const j = await r.json();
-  if (j.role === 'admin') { const nav = document.getElementById("navSettings"); if (nav) nav.style.display = "inline-block"; }
-}
-checkAdmin();
+    function esc(s) { return (s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+    function fmtTime(s) { if (!s) return "-"; try { return new Date(s).toLocaleString(); } catch (e) { return s; } }
+    async function logout() { await fetch("/api/logout", { method: "POST" }); location.href = "/login.html"; }
+    async function checkAdmin() {
+      const r = await fetch("/api/me"); const j = await r.json();
+      if (j.role === 'admin') { const nav = document.getElementById("navSettings"); if (nav) nav.style.display = "inline-block"; }
+    }
+    checkAdmin();
 
-const params = new URLSearchParams(location.search);
-const id = params.get("id");
-let currentItem = null;
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+    let currentItem = null;
 
-async function setStatus(to_status){
-  await fetch(`/api/items/${encodeURIComponent(id)}/status`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ to_status }) });
-  loadAll();
-}
-async function setInventory(inventory_status){
-  await fetch(`/api/items/${encodeURIComponent(id)}/inventory`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ inventory_status }) });
-  loadAll();
-}
-async function togglePosted(){
-  if(!currentItem) return;
-  const next = currentItem.is_posted ? 0 : 1;
-  const r = await fetch(`/api/items/${encodeURIComponent(id)}/posted`, { 
-    method:"POST", 
-    headers:{"Content-Type":"application/json"}, 
-    body:JSON.stringify({ is_posted: next }) 
-  });
-  if(r.ok) loadAll();
-}
-async function toggleMeru(){
-  if(!currentItem) return;
-  const next = currentItem.is_meru_logged ? 0 : 1;
-  const r = await fetch(`/api/items/${encodeURIComponent(id)}/meru-logged`, { 
-    method:"POST", 
-    headers:{"Content-Type":"application/json"}, 
-    body:JSON.stringify({ is_meru_logged: next }) 
-  });
-  if(r.ok) loadAll();
-}
-async function delItem(){
-  if(!confirm("Xoá sản phẩm này?")) return;
-  await fetch(`/api/items/${encodeURIComponent(id)}/delete`, { method: "POST" });
-  location.href = "/list.html";
-}
+    async function setStatus(to_status) {
+      await fetch(`/api/items/${encodeURIComponent(id)}/status`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to_status }) });
+      loadAll();
+    }
+    async function setInventory(inventory_status) {
+      await fetch(`/api/items/${encodeURIComponent(id)}/inventory`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inventory_status }) });
+      loadAll();
+    }
+    async function togglePosted() {
+      if (!currentItem) return;
+      const next = currentItem.is_posted ? 0 : 1;
+      const r = await fetch(`/api/items/${encodeURIComponent(id)}/posted`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_posted: next })
+      });
+      if (r.ok) loadAll();
+    }
+    async function toggleMeru() {
+      if (!currentItem) return;
+      const next = currentItem.is_meru_logged ? 0 : 1;
+      const r = await fetch(`/api/items/${encodeURIComponent(id)}/meru-logged`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_meru_logged: next })
+      });
+      if (r.ok) loadAll();
+    }
+    async function delItem() {
+      if (!confirm("Xoá sản phẩm này?")) return;
+      await fetch(`/api/items/${encodeURIComponent(id)}/delete`, { method: "POST" });
+      location.href = "/list.html";
+    }
 
-async function loadItem(){
-  if(!id) return;
-  const r = await fetch(`/api/items/${encodeURIComponent(id)}`);
-  const json = await r.json();
-  if(!r.ok) { document.getElementById("box").innerHTML = `<div class="card">${esc(json.error)}</div>`; return; }
+    async function loadItem() {
+      if (!id) return;
+      const r = await fetch(`/api/items/${encodeURIComponent(id)}`);
+      const json = await r.json();
+      if (!r.ok) { document.getElementById("box").innerHTML = `<div class="card">${esc(json.error)}</div>`; return; }
 
-  const it = json.item; currentItem = it;
-  const me = await (await fetch("/api/me")).json();
-  const isAdmin = me.role === "admin";
-  const isStaff = me.role === "admin" || me.role === "staff";
-  const isEntry = me.role === "entry";
-  
-  // Update Nav visibility
-  if (isAdmin && me.user === "tho") {
-    document.getElementById("navSettings").style.display = "inline-block";
-  }
-  if (isEntry) {
-    document.getElementById("navScan").style.display = "none";
-    document.getElementById("navInventory").style.display = "none";
-  }
-  
-  let diffDays = 0;
-  if (it.status === 'RETURN' || it.status === 'REQUEST_RETURN') {
-    diffDays = 0;
-  } else if (it.status === 'SHIPPED' && it.shipped_at) {
-    diffDays = Math.ceil(Math.abs(new Date(it.shipped_at) - new Date(it.created_at)) / 86400000);
-  } else {
-    diffDays = Math.ceil(Math.abs(new Date() - new Date(it.created_at)) / 86400000);
-  }
-  const isStale = diffDays > 15 && (it.status==='CREATED');
+      const it = json.item; currentItem = it;
+      const me = await (await fetch("/api/me")).json();
+      const isAdmin = me.role === "admin";
+      const isStaff = me.role === "admin" || me.role === "staff";
+      const isEntry = me.role === "entry";
 
-  document.getElementById("box").innerHTML = `
+      // Update Nav visibility
+      if (isAdmin && me.user === "tho") {
+        document.getElementById("navSettings").style.display = "inline-block";
+      }
+      if (isEntry) {
+        document.getElementById("navScan").style.display = "none";
+        document.getElementById("navInventory").style.display = "none";
+      }
+
+      let diffDays = 0;
+      if (it.status === 'RETURN' || it.status === 'REQUEST_RETURN') {
+        diffDays = 0;
+      } else if (it.status === 'SHIPPED' && it.shipped_at) {
+        diffDays = Math.ceil(Math.abs(new Date(it.shipped_at) - new Date(it.created_at)) / 86400000);
+      } else {
+        diffDays = Math.ceil(Math.abs(new Date() - new Date(it.created_at)) / 86400000);
+      }
+      const isStale = diffDays > 15 && (it.status === 'CREATED');
+
+      document.getElementById("box").innerHTML = `
     <div class="card" style="margin-top:0">
       ${isStale ? `<div style="background:#fee2e2; color:#b91c1c; padding:12px; border-radius:12px; margin-bottom:16px; font-weight:700; font-size:14px">⚠️ Hàng đã lưu kho ${diffDays} ngày (Quá hạn)</div>` : ""}
       
@@ -240,8 +261,8 @@ async function loadItem(){
       <div class="detail-grid">
         <div class="detail-item"><div class="detail-label">Mã Kiện</div><div class="detail-value" style="color:var(--primary)">${esc(it.package_id)}</div></div>
         <div class="detail-item"><div class="detail-label">Mã Vận Đơn</div><div class="detail-value">${esc(it.mvd)}</div></div>
-        <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="pill" style="${{SHIPPED:'background:#dcfce7;color:#166534',RETURN:'background:#f1f5f9;color:#64748b',RETURNED:'background:#f1f5f9;color:#64748b',CREATED:'background:#fef9c3;color:#854d0e',REQUEST_RETURN:'background:#ffedd5;color:#9a3412'}[it.status]||''}">
-          ${{SHIPPED:'🟢',RETURN:'⚫',RETURNED:'⚫',CREATED:'🟡',REQUEST_RETURN:'🟠'}[it.status]||'❓'} ${esc(it.status)}
+        <div class="detail-item"><div class="detail-label">Status</div><div class="detail-value"><span class="pill" style="${{ SHIPPED: 'background:#dcfce7;color:#166534', RETURN: 'background:#f1f5f9;color:#64748b', RETURNED: 'background:#f1f5f9;color:#64748b', CREATED: 'background:#fef9c3;color:#854d0e', REQUEST_RETURN: 'background:#ffedd5;color:#9a3412' }[it.status] || ''}">
+          ${{ SHIPPED: '🟢', RETURN: '⚫', RETURNED: '⚫', CREATED: '🟡', REQUEST_RETURN: '🟠' }[it.status] || '❓'} ${esc(it.status)}
         </span></div></div>
         <div class="detail-item"><div class="detail-label">Loại hàng</div><div class="detail-value"><span class="pill" style="background:var(--primary-light)">${esc(it.category)}</span></div></div>
         <div class="detail-item"><div class="detail-label">Tồn kho</div><div class="detail-value"><span class="pill">${esc(it.inventory_status)}</span></div></div>
@@ -259,50 +280,51 @@ async function loadItem(){
       <div id="photoBox" style="margin-top:24px"></div>
     </div>
   `;
-  
-  const png = await makeLabelPng({ mvd:it.mvd, serial:it.serial_clean||it.serial_raw, name:it.name, qrDataUrl:json.qrDataUrl });
-  document.getElementById("photoBox").innerHTML = `
+
+      const png = await makeLabelPng({ mvd: it.mvd, serial: it.serial_clean || it.serial_raw, name: it.name, qrDataUrl: json.qrDataUrl });
+      document.getElementById("photoBox").innerHTML = `
     <div style="background:var(--bg); padding:20px; border-radius:16px; text-align:center">
       <div class="detail-label" style="margin-bottom:12px">Bản xem trước Tem In</div>
       <img src="${png}" style="max-width:320px; width:100%; border-radius:4px; box-shadow:var(--shadow-lg)"/>
       <div style="font-size:12px; color:var(--muted); margin-top:8px">Mã QR chứa Token bảo mật để truy cập nhanh</div>
     </div>
   `;
-}
-
-async function loadHistory() {
-  const r = await fetch(`/api/items/${encodeURIComponent(id)}/history`);
-  const json = await r.json(); if (!r.ok) return;
-  document.getElementById("timelineContainer").style.display = "block";
-  const tl = document.getElementById("timeline");
-  if (!json.history.length) { tl.innerHTML = "Chưa có lịch sử."; return; }
-  
-  tl.innerHTML = json.history.map(h => {
-    let icon = "⚪", content = "";
-    if (h.type === "status") { icon = "🚚"; content = `Cập nhật trạng thái: <b>${esc(h.from_status)}</b> ➔ <b>${esc(h.to_status)}</b>`; }
-    else if (h.type === "inventory") { icon = "📦"; content = `Kiểm kho: <b>${esc(h.action)}</b>`; }
-    else if (h.type === "edit") { 
-      const changes = JSON.parse(h.changes_json || "{}");
-      if ("is_posted" in changes) {
-        icon = "🏷️";
-        content = changes.is_posted ? "Đã đánh dấu <b>Đăng bán</b>" : "Đã <b>Hủy đăng bán</b>";
-      } else {
-        icon = "✏️"; 
-        content = `Sửa thông tin: ` + JSON.stringify(changes); 
-      }
     }
-    else if (h.type === "created") { icon = "🆕"; content = `Sản phẩm được tạo mới`; }
-    return `
+
+    async function loadHistory() {
+      const r = await fetch(`/api/items/${encodeURIComponent(id)}/history`);
+      const json = await r.json(); if (!r.ok) return;
+      document.getElementById("timelineContainer").style.display = "block";
+      const tl = document.getElementById("timeline");
+      if (!json.history.length) { tl.innerHTML = "Chưa có lịch sử."; return; }
+
+      tl.innerHTML = json.history.map(h => {
+        let icon = "⚪", content = "";
+        if (h.type === "status") { icon = "🚚"; content = `Cập nhật trạng thái: <b>${esc(h.from_status)}</b> ➔ <b>${esc(h.to_status)}</b>`; }
+        else if (h.type === "inventory") { icon = "📦"; content = `Kiểm kho: <b>${esc(h.action)}</b>`; }
+        else if (h.type === "edit") {
+          const changes = JSON.parse(h.changes_json || "{}");
+          if ("is_posted" in changes) {
+            icon = "🏷️";
+            content = changes.is_posted ? "Đã đánh dấu <b>Đăng bán</b>" : "Đã <b>Hủy đăng bán</b>";
+          } else {
+            icon = "✏️";
+            content = `Sửa thông tin: ` + JSON.stringify(changes);
+          }
+        }
+        else if (h.type === "created") { icon = "🆕"; content = `Sản phẩm được tạo mới`; }
+        return `
       <div class="timeline-item">
         <div class="timeline-time">${fmtTime(h.created_at)}</div>
         <div class="timeline-content"><span class="timeline-actor">${esc(h.actor)}</span>: ${icon} ${content}</div>
       </div>
     `;
-  }).join("");
-}
+      }).join("");
+    }
 
-async function loadAll(){ await loadItem(); await loadHistory(); }
-loadAll();
-</script>
+    async function loadAll() { await loadItem(); await loadHistory(); }
+    loadAll();
+  </script>
 </body>
+
 </html>
