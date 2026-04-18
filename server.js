@@ -11,17 +11,25 @@ const FormData = require("form-data");
 const { createCanvas, loadImage, registerFont } = require("canvas");
 const db = require("./db");
 
-// Đăng ký Font tiếng Nhật để vẽ Tem nhãn chính xác
+// Đăng ký Font tiếng Nhật và Latin để vẽ Tem nhãn chính xác
 try {
-  const fontPath = path.join(__dirname, 'fonts', 'NotoSansJP-Bold.ttf');
-  if (fs.existsSync(fontPath)) {
-    registerFont(fontPath, { family: 'Noto Sans JP' });
-    console.log("✅ Registered Japanese Font (Noto Sans JP)");
-  } else {
-    console.warn("⚠️ Font file not found, Japanese characters might be broken.");
+  const fontDir = path.join(__dirname, 'fonts');
+  
+  // Font tiếng Nhật (Noto Sans JP)
+  const notoPath = path.join(fontDir, 'NotoSansJP-Bold.ttf');
+  if (fs.existsSync(notoPath)) {
+    registerFont(notoPath, { family: 'Noto Sans JP' });
+    console.log("✅ Registered: Noto Sans JP");
+  }
+
+  // Font Latin mới (Gill Sans MT Bold)
+  const gillPath = path.join(fontDir, 'GillSansMT_Bold.ttf');
+  if (fs.existsSync(gillPath)) {
+    registerFont(gillPath, { family: 'Gill Sans MT' });
+    console.log("✅ Registered: Gill Sans MT");
   }
 } catch (e) {
-  console.error("❌ Failed to register font:", e);
+  console.error("❌ Failed to register fonts:", e);
 }
 
 const app = express();
@@ -383,13 +391,13 @@ async function generateLabelBuffer(item, qrBuffer) {
   ctx.fillStyle = "#000";
 
   // MVD
-  ctx.font = "bold 34px 'Noto Sans JP'";
+  ctx.font = "bold 34px 'Gill Sans MT'";
   let y = pad + 40;
   ctx.fillText(String(item.mvd || "-").trim(), leftX, y);
 
   // Serial
   y += 28;
-  ctx.font = "bold 18px 'Noto Sans JP'";
+  ctx.font = "bold 18px 'Gill Sans MT'";
   let sn = (item.serial_clean || item.serial_raw || "-").trim();
   while (ctx.measureText(sn).width > textW && sn.length > 4) { sn = sn.slice(0, -2) + "…"; }
   ctx.fillText(sn, leftX, y);
