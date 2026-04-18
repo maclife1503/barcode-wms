@@ -127,6 +127,14 @@
       let currentLine = "";
       for (let i = 0; i < text.length; i++) {
         const char = text[i];
+        if (char === '\n') {
+          ctx.fillText(currentLine, x, y);
+          y += lineHeight;
+          lines++;
+          currentLine = "";
+          if (maxLines && lines >= maxLines) return y;
+          continue;
+        }
         const testLine = currentLine + char;
         if (ctx.measureText(testLine).width > maxWidth && currentLine.length > 0) {
           ctx.fillText(currentLine, x, y);
@@ -156,7 +164,7 @@
       ctx.save(); ctx.beginPath(); ctx.rect(pad, pad, qrX - 12, LABEL_H - pad * 2); ctx.clip();
       ctx.fillStyle = "#000"; ctx.font = "bold 34px 'Gill Sans MT', system-ui"; ctx.fillText(String(mvd || "-"), pad, pad + 40);
       ctx.font = "bold 18px 'Gill Sans MT', system-ui"; let sn = (serial || "-"); while (ctx.measureText(sn).width > qrX - 12 && sn.length > 4) sn = sn.slice(0, -2) + "…";
-      ctx.fillText(sn, pad, pad + 68); ctx.font = "bold 20px 'Gill Sans MT', system-ui"; wrapText(ctx, (name || "-"), pad, pad + 98, qrX - 12, 28, 20);
+      ctx.fillText(sn, pad, pad + 68); ctx.font = "bold 20px 'Gill Sans MT', system-ui"; wrapText(ctx, (name || "-"), pad, pad + 98, qrX - 12, 30, 20);
       ctx.restore();
       try {
         const logoImg = await loadImage(logoUrl); ctx.imageSmoothingEnabled = true; const scale = Math.min((qrX - 12) / logoImg.width, 140 / logoImg.height);

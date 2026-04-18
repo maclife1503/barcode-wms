@@ -348,9 +348,20 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
   let lines = 0;
   let currentLine = "";
 
-  // Duyệt qua từng ký tự để hỗ trợ các ngôn ngữ không có dấu cách như tiếng Nhật
+  // Chia nhỏ text theo ký tự để hỗ trợ tiếng Nhật và xử lý \n
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
+
+    // Nếu gặp ký tự xuống dòng thực sự (\n)
+    if (char === '\n') {
+      ctx.fillText(currentLine, x, y);
+      y += lineHeight;
+      lines++;
+      currentLine = "";
+      if (maxLines && lines >= maxLines) return y;
+      continue;
+    }
+
     const testLine = currentLine + char;
     const metrics = ctx.measureText(testLine);
 
@@ -412,7 +423,7 @@ async function generateLabelBuffer(item, qrBuffer) {
   // Name
   y += 30; // Khoảng cách từ Serial xuống Name
   ctx.font = "bold 20px 'Gill Sans MT', 'Hiragino Sans'";
-  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 28, 20); // Cho phép tối đa 20 dòng để tràn xuống thoải mái
+  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 30, 20); // lineHeight 30px
 
   // Logo
   try {
