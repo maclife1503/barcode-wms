@@ -353,10 +353,9 @@
                 <th style="width:110px">Package</th>
                 <th style="width:250px">Name</th>
                 <th class="hide-mobile" style="width:160px">Serial</th>
-                <th style="width:120px">Status</th>
                 <th class="hide-mobile" style="width:120px">Inventory</th>
                 <th class="hide-mobile" style="width:100px">Stock</th>
-                <th class="hide-mobile" style="width:160px">Updated</th>
+                <th style="width:160px">Updated</th>
               </tr>
             </thead>
             <tbody>
@@ -377,10 +376,9 @@
                     ${r.is_posted ? '<span title="Đã đăng bán">🏷️</span> ' : ''}${esc(r.name)}
                   </td>
                   <td class="hide-mobile" style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
-                  <td>${statusPill(r.status)}</td>
                   <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status === 'IN_STOCK' ? '#dbeafe' : '#f1f5f9'}">${esc(r.inventory_status)}</span></td>
                   <td class="hide-mobile">${diff} ngày ${isStale ? '⚠️' : ''}</td>
-                  <td class="hide-mobile" style="font-size:12px; color:var(--muted)">${fmtTime(r.updated_at)}</td>
+                  <td style="font-size:12px; color:var(--muted)">${fmtTime(r.updated_at)}</td>
                 </tr>
               `}).join("")}
             </tbody>
