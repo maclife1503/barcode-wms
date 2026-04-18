@@ -411,8 +411,8 @@ async function generateLabelBuffer(item, qrBuffer) {
 
   // Name
   y += 30; // Khoảng cách từ Serial xuống Name
-  ctx.font = "bold 20px 'Hiragino Sans'";
-  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 28, 7);
+  ctx.font = "bold 20px 'Gill Sans MT', 'Hiragino Sans'";
+  wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 28, 20); // Cho phép tối đa 20 dòng để tràn xuống thoải mái
 
   // Logo
   try {
