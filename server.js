@@ -22,11 +22,18 @@ try {
     console.log("✅ Registered: Noto Sans JP");
   }
 
-  // Font Latin mới (Gill Sans MT Bold)
+  // Font Latin (Gill Sans MT Bold)
   const gillPath = path.join(fontDir, 'GillSansMT_Bold.ttf');
   if (fs.existsSync(gillPath)) {
     registerFont(gillPath, { family: 'Gill Sans MT' });
     console.log("✅ Registered: Gill Sans MT");
+  }
+
+  // Font Nhật cao cấp (Hiragino Sans GB)
+  const hiraPath = path.join(fontDir, 'Hiragino_Sans_GB_W3.ttf');
+  if (fs.existsSync(hiraPath)) {
+    registerFont(hiraPath, { family: 'Hiragino Sans' });
+    console.log("✅ Registered: Hiragino Sans");
   }
 } catch (e) {
   console.error("❌ Failed to register fonts:", e);
@@ -403,8 +410,8 @@ async function generateLabelBuffer(item, qrBuffer) {
   ctx.fillText(sn, leftX, y);
 
   // Name
-  y += 30;
-  ctx.font = "bold 20px 'Noto Sans JP'";
+  y += 30; // Khoảng cách từ Serial xuống Name
+  ctx.font = "bold 20px 'Hiragino Sans'";
   wrapText(ctx, (item.name || "-").trim(), leftX, y, textW, 28, 7);
 
   // Logo
