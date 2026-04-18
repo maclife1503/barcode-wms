@@ -325,21 +325,43 @@
 
       // Grouping
       const groups = {};
-      const shouldGroup = !(currentTab === 'shipped' || currentTab === 'return');
+      const isShippedOrReturn = (currentTab === 'shipped' || currentTab === 'return');
 
       displayRows.forEach(item => {
-        const cat = shouldGroup ? (item.category || 'else') : 'Danh sách sản phẩm';
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(item);
+        let groupKey;
+        if (isShippedOrReturn) {
+          if (item.updated_at) {
+            const date = new Date(item.updated_at);
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            groupKey = `Tháng ${m}/${y}`;
+          } else {
+            groupKey = "Khác";
+          }
+        } else {
+          groupKey = item.category || 'else';
+        }
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(item);
       });
 
       let tablesHtml = "";
-      const sortedCats = Object.keys(groups).sort((a, b) => {
-        if (!shouldGroup) return 0;
+      const sortedKeys = Object.keys(groups).sort((a, b) => {
+        if (isShippedOrReturn) {
+          if (a === 'Khác') return 1;
+          if (b === 'Khác') return -1;
+          // Sort reverse: Tháng 05/2026 > Tháng 04/2026
+          const parseKey = (s) => {
+            const parts = s.match(/Tháng (\d+)\/(\d+)/);
+            if (!parts) return 0;
+            return parseInt(parts[2]) * 100 + parseInt(parts[1]);
+          };
+          return parseKey(b) - parseKey(a);
+        }
         return (a === 'else' ? 1 : b === 'else' ? -1 : a.localeCompare(b));
       });
 
-      sortedCats.forEach(cat => {
+      sortedKeys.forEach(cat => {
         const items = groups[cat];
         tablesHtml += `
       <h3 style="margin: 24px 0 12px; display:flex; align-items:center; gap:10px; text-transform:capitalize">
