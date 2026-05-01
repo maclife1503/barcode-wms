@@ -1,22 +1,22 @@
 /* Import Google Font: Inter */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ===== Core Variables: Indigo & Slate & Premium Feel ===== */
+/* ===== Core Variables: Apple Style ===== */
 :root {
   --pad: 16px;
   --gap: 12px;
-  --radius: 20px;
+  --radius: 18px;
   --radius-sm: 12px;
-  --primary: #4f46e5;
-  --primary-dark: #4338ca;
-  --primary-light: #eef2ff;
-  --bg: #f8fafc;
-  --card-bg: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --primary: #0071E3;
+  --primary-dark: #005bb5;
+  --primary-light: #E5F0FA;
+  --bg: #F5F5F7;
+  --card-bg: #FFFFFF;
+  --text: #1D1D1F;
+  --muted: #86868B;
+  --border: rgba(0, 0, 0, 0.08);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.03);
 }
 
 /* ===== Base Styles ===== */
@@ -32,9 +32,10 @@ body {
   margin: 0;
   padding: var(--pad);
   padding-top: 80px; /* Chừa chỗ cho Fixed Topbar */
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   color: var(--text);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ===== Glassmenorphism Topbar ===== */
@@ -48,11 +49,10 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
 }
 
 .nav {
@@ -150,23 +150,23 @@ h2, h3, h4 {
 .card {
   width: 100%;
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--radius);
   padding: var(--pad);
   margin: 16px 0;
   box-shadow: var(--shadow);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease;
 }
 
 /* Hover effect cho dashboard cards */
 .card.interactive {
   cursor: pointer;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
 }
 .card.interactive:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
-  border-color: var(--primary);
+  border-color: rgba(0, 113, 227, 0.3);
 }
 
 /* ===== Buttons & Inputs ===== */
@@ -180,24 +180,23 @@ button {
   transition: all 0.2s;
 }
 
-/* Primary Button with Gradient */
+/* Primary Button (Flat Color) */
 button:not(.logout-btn):not([onclick*="delete"]):not([onclick*="delItem"]) {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  background: var(--primary);
   color: white;
-  box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+  box-shadow: none;
 }
 button:not(.logout-btn):hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
+  background: var(--primary-dark);
 }
-button:active { transform: translateY(0); }
+button:active { transform: scale(0.97); }
 
 /* Inputs */
 input[type="text"], input[type="number"], select, textarea {
   font-family: inherit;
   width: 100%;
   padding: 12px 14px;
-  border: 1.5px solid var(--border);
+  border: 0.5px solid rgba(0,0,0,0.15);
   border-radius: var(--radius-sm);
   background: #fff;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -231,15 +230,15 @@ table {
 }
 
 th {
-  background: #f8fafc;
+  background: transparent;
   color: var(--muted);
   font-weight: 600;
   text-align: left;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
 }
 
 td {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
 }
 
 tr:last-child td { border-bottom: none; }
