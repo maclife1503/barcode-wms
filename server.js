@@ -9,6 +9,8 @@ const QRCode = require("qrcode");
 const crypto = require("crypto");
 const FormData = require("form-data");
 const { createCanvas, loadImage, registerFont } = require("canvas");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const db = require("./db");
 
 // Đăng ký Font tiếng Nhật và Latin để vẽ Tem nhãn chính xác
@@ -40,6 +42,29 @@ try {
 }
 
 const app = express();
+
+// ====== Security Middleware ======
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled CSP to avoid breaking inline scripts/styles
+}));
+app.disable('x-powered-by');
+
+const globalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 phút
+  max: 500, // 500 requests per minute
+  message: { error: "Quá nhiều yêu cầu, vui lòng thử lại sau." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 5, // Tối đa 5 lần
+  message: { error: "Bạn đã thử sai quá nhiều lần. Vui lòng quay lại sau 15 phút." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ====== body + cookies ======
 app.use(express.json({ limit: "1mb" }));
@@ -151,7 +176,7 @@ app.use(express.static("public"));
 app.get("/", (req, res) => res.redirect("/login.html"));
 
 // ====== Login/Logout ======
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   const user = USERS[username];
@@ -166,7 +191,7 @@ app.post("/api/login", async (req, res) => {
 
   res.cookie("wms_auth", makeSessionCookie(username), {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
   });
 
   // Tự động kiểm tra hàng tồn quá hạn khi có người login (không block response)
