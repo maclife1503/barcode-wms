@@ -1876,7 +1876,7 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   const { id } = req.params;
   const { to_status } = req.body;
 
-  const allowed = new Set(["SHIPPED", "RETURN", "CREATED", "REQUEST_RETURN"]);
+  const allowed = new Set(["SHIPPED", "RETURN", "RETURNED", "HENBIN", "CREATED", "REQUEST_RETURN"]);
   if (!allowed.has(to_status)) return res.status(400).json({ error: "Invalid status" });
 
   const { rows } = await db.execute({ sql: "SELECT * FROM items WHERE id = ?", args: [id] });
@@ -1893,16 +1893,21 @@ app.post("/api/items/:id/status", requireAuth, requireStaff, async (req, res) =>
   let inventory_status = item.inventory_status;
   let shipped_at = item.shipped_at;
 
+  const returnStatuses = new Set(["RETURN", "RETURNED", "HENBIN", "REQUEST_RETURN"]);
+  let created_at = item.created_at;
+
   if (to_status === "SHIPPED") {
     inventory_status = "NOT_IN_STOCK";
     shipped_at = updated_at;
-  } else if (to_status === "RETURN") {
+  } else if (returnStatuses.has(to_status)) {
     inventory_status = "NOT_IN_STOCK";
+    // Reset created_at to current time so stock days starts from 0
+    created_at = updated_at;
   }
 
   await db.execute({
-    sql: "UPDATE items SET status = ?, inventory_status = ?, shipped_at = ?, updated_at = ? WHERE id = ?",
-    args: [to_status, inventory_status, shipped_at, updated_at, id]
+    sql: "UPDATE items SET status = ?, inventory_status = ?, shipped_at = ?, created_at = ?, updated_at = ? WHERE id = ?",
+    args: [to_status, inventory_status, shipped_at, created_at, updated_at, id]
   });
 
   // CHỈ ghi log nếu trạng thái thay đổi

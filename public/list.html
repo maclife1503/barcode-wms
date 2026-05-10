@@ -412,7 +412,8 @@
             <tbody>
               ${items.map(r => {
           let diff = 0;
-          if (r.status === 'RETURN' || r.status === 'REQUEST_RETURN') {
+          const returnStatuses = ['RETURN', 'RETURNED', 'HENBIN', 'REQUEST_RETURN'];
+          if (returnStatuses.includes(r.status)) {
             diff = 0;
           } else if (r.status === 'SHIPPED' && r.shipped_at) {
             diff = Math.ceil((new Date(r.shipped_at) - new Date(r.created_at)) / (86400000));

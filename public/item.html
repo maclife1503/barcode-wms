@@ -242,7 +242,8 @@
       }
 
       let diffDays = 0;
-      if (it.status === 'RETURN' || it.status === 'REQUEST_RETURN') {
+      const returnStatuses = ['RETURN', 'RETURNED', 'HENBIN', 'REQUEST_RETURN'];
+      if (returnStatuses.includes(it.status)) {
         diffDays = 0;
       } else if (it.status === 'SHIPPED' && it.shipped_at) {
         diffDays = Math.ceil(Math.abs(new Date(it.shipped_at) - new Date(it.created_at)) / 86400000);
