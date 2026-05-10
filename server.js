@@ -173,6 +173,7 @@ app.use("/exports", (req, res, next) => {
 app.use(express.static("public"));
 
 // ====== Root ======
+app.get("/api/ping", (req, res) => res.send("pong"));
 app.get("/", (req, res) => res.redirect("/login.html"));
 
 // ====== Login/Logout ======
