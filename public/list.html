@@ -32,6 +32,7 @@
     <button class="tab-btn" id="tab-shipped" onclick="setTab('shipped')">Shipped</button>
     <button class="tab-btn" id="tab-return" onclick="setTab('return')">Return</button>
     <button class="tab-btn" id="tab-not_posted" onclick="setTab('not_posted')">Not Posted 🏷️</button>
+    <button class="tab-btn" id="tab-not_logged" onclick="setTab('not_logged')">Not Logged 📝</button>
   </div>
 
   <div class="card no-print">
@@ -122,6 +123,10 @@
   #tab-not_posted.active { 
     background: #f59e0b; border-color: #f59e0b; 
     box-shadow: 0 4px 10px rgba(245, 158, 11, 0.25); 
+  }
+  #tab-not_logged.active { 
+    background: #ec4899; border-color: #ec4899; 
+    box-shadow: 0 4px 10px rgba(236, 72, 153, 0.25); 
   }
 `;
     document.head.appendChild(style);
@@ -237,7 +242,7 @@
       // Nếu chọn tab khác All, reset status dropdown để tránh xung đột
       if (tab !== 'all') {
         document.getElementById("status").value = "";
-        if (tab === 'not_posted') document.getElementById("posted").value = "";
+        if (tab === 'not_posted' || tab === 'not_logged') document.getElementById("posted").value = "";
       }
 
       load();

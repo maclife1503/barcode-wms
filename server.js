@@ -1543,6 +1543,8 @@ function buildItemQuery(req) {
     where.push(`status = 'SHIPPED'`);
   } else if (tab === 'return') {
     where.push(`status IN ('HENBIN', 'RETURNED', 'RETURN', 'REQUEST_RETURN')`);
+  } else if (tab === 'not_logged') {
+    where.push(`is_meru_logged = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN', 'RETURN', 'REQUEST_RETURN')`);
   } else if (tab === 'not_posted') {
     where.push(`is_posted = 0 AND status NOT IN ('SHIPPED', 'RETURNED', 'HENBIN', 'RETURN', 'REQUEST_RETURN')`);
   } else if (status) {
