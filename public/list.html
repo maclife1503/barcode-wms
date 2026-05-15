@@ -196,6 +196,23 @@
       }
     }
 
+    async function toggleMeru(id, currentVal) {
+      const next = currentVal ? 0 : 1;
+      try {
+        const r = await fetch(`/api/items/${id}/meru-logged`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_meru_logged: next })
+        });
+        if (r.ok) {
+          showToast(next ? '✅ Đã Log Meru' : '🔄 Đã hủy Log Meru');
+          const it = cachedData.rows.find(i => i.id === id);
+          if (it) it.is_meru_logged = next;
+          render();
+        }
+      } catch (e) { showToast('❌ Lỗi kết nối', true); }
+    }
+
     async function requestReturn(id, name) {
       if (!confirm(`Gửi yêu cầu Return và Xóa sản phẩm:\n"${name}"?`)) return;
       try {
@@ -411,6 +428,7 @@
                 <th class="hide-mobile" style="width:160px">Serial</th>
                 <th class="hide-mobile" style="width:120px">Inventory</th>
                 <th class="hide-mobile" style="width:100px">Stock</th>
+                <th style="width:80px">Log</th>
                 ${!isShippedOrReturn ? `<th style="width:160px">Updated</th>` : ""}
               </tr>
             </thead>
@@ -444,6 +462,12 @@
                   <td class="hide-mobile" style="color:var(--muted); font-family:monospace; font-size:13px">${esc(r.serial_clean || "-")}</td>
                   <td class="hide-mobile"><span class="pill" style="background:${r.inventory_status === 'IN_STOCK' ? '#dbeafe' : '#f1f5f9'}">${esc(r.inventory_status)}</span></td>
                   <td class="hide-mobile">${diff} ngày ${isStale ? '⚠️' : ''}</td>
+                  <td>
+                    <button onclick="toggleMeru(${r.id}, ${r.is_meru_logged})" 
+                            style="padding:4px 8px; font-size:11px; border-radius:8px; font-weight:700; background:${r.is_meru_logged ? '#dcfce7' : '#f1f5f9'}; color:${r.is_meru_logged ? '#166534' : '#64748b'}; border:1px solid ${r.is_meru_logged ? '#bbf7d0' : '#e2e8f0'}; min-width:65px; cursor:pointer">
+                      ${r.is_meru_logged ? 'Logged' : 'Log'}
+                    </button>
+                  </td>
                   ${!isShippedOrReturn ? `<td style="font-size:12px; color:var(--muted)">${timeStr}</td>` : ""}
                 </tr>
               `}).join("")}
