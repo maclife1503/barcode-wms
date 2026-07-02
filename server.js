@@ -2021,17 +2021,39 @@ app.get("/api/scan/:token", requireAuth, async (req, res) => {
 
 // ====== Inventory work ======
 app.post("/api/inventory/add", requireAuth, requireStaff, async (req, res) => {
-  const { token } = req.body || {};
-  if (!token) return res.status(400).json({ error: "Missing token" });
+  const { token, serial } = req.body || {};
+  if (!token && !serial) return res.status(400).json({ error: "Thiếu token hoặc serial" });
 
-  const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
-  const item = itemRows[0];
-  if (!item) return res.status(404).json({ error: "Not found" });
+  let item;
+  if (token) {
+    const { rows: itemRows } = await db.execute({ sql: "SELECT * FROM items WHERE token = ?", args: [token] });
+    item = itemRows[0];
+  } else {
+    const cleanSerial = serial.trim();
+    // Tìm kiếm theo serial_clean, serial_raw hoặc package_id
+    const { rows: itemRows } = await db.execute({
+      sql: "SELECT * FROM items WHERE (LOWER(serial_clean) = LOWER(?) OR serial_raw = ? OR package_id = ?) AND is_deleted = 0",
+      args: [cleanSerial, cleanSerial, cleanSerial]
+    });
+    if (itemRows.length === 0) {
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+    }
+    
+    // Ưu tiên sản phẩm chưa được xuất (status !== 'SHIPPED')
+    const activeItems = itemRows.filter(x => x.status !== 'SHIPPED');
+    if (activeItems.length > 0) {
+      item = activeItems[0];
+    } else {
+      item = itemRows[0];
+    }
+  }
+
+  if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
   if (item.is_deleted === 1 || item.status === "DELETED") {
-    return res.status(400).json({ error: "Item is deleted" });
+    return res.status(400).json({ error: "Sản phẩm đã bị xóa" });
   }
   if (item.status === "SHIPPED") {
-    return res.status(400).json({ error: "Hàng đã giao, không thể kiểm kho lại." });
+    return res.status(400).json({ error: `Hàng đã giao (${item.package_id}), không thể kiểm kho lại.` });
   }
 
   const date_key = yyyymmddLocal();
@@ -2048,7 +2070,7 @@ app.post("/api/inventory/add", requireAuth, requireStaff, async (req, res) => {
     `,
       args: [
         date_key,
-        token,
+        item.token,
         item.id,
         item.package_id || "",
         item.name || "",
@@ -2072,8 +2094,11 @@ app.post("/api/inventory/add", requireAuth, requireStaff, async (req, res) => {
     });
 
     await tx.commit();
-    res.json({ ok: true });
+    res.json({ ok: true, item });
   } catch (e) {
+    if (e.message && e.message.includes("UNIQUE constraint failed")) {
+      return res.status(400).json({ error: `Sản phẩm "${item.name}" đã được kiểm kê hôm nay rồi.`, item });
+    }
     res.status(500).json({ error: e.message || "DB error" });
   }
 });

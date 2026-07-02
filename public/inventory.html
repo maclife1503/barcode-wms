@@ -31,6 +31,15 @@
     </div>
   </div>
 
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-bottom:12px">Kiểm kê nhanh bằng Serial</h3>
+    <form id="checkSerialForm" onsubmit="checkSerial(event)" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+      <input type="text" id="serialInput" placeholder="Nhập Serial hoặc Package ID..." style="flex:1; min-width:200px" required autofocus />
+      <button type="submit" style="background:var(--primary); color:white; height:42px; padding:0 20px">Kiểm kho</button>
+    </form>
+    <div id="serialResult" style="margin-top:12px; display:none; padding:12px; border-radius:var(--radius-sm)"></div>
+  </div>
+
   <div id="box"></div>
 
 <script>
@@ -118,7 +127,90 @@ async function deleteExport(id, filename){
   else alert("Xoá thất bại");
 }
 
+async function checkSerial(e) {
+  e.preventDefault();
+  const input = document.getElementById("serialInput");
+  const resultDiv = document.getElementById("serialResult");
+  const val = input.value.trim();
+  if (!val) return;
+
+  resultDiv.style.display = "block";
+  resultDiv.className = ""; 
+  resultDiv.style.background = "#f8fafc";
+  resultDiv.style.border = "1px solid var(--border)";
+  resultDiv.style.color = "var(--text)";
+  resultDiv.innerHTML = "<i>Đang kiểm tra...</i>";
+
+  try {
+    const r = await fetch("/api/inventory/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serial: val })
+    });
+    const res = await r.json();
+
+    if (r.ok) {
+      const it = res.item;
+      resultDiv.style.background = "#f0fdf4";
+      resultDiv.style.border = "1px solid #bbf7d0";
+      resultDiv.style.color = "#166534";
+      resultDiv.innerHTML = `
+        <div style="font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>✅</span> Kiểm kho thành công!
+        </div>
+        <div style="font-size: 13.5px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;">
+          <span style="color:#15803d">Sản phẩm:</span> <b>${esc(it.name)}</b>
+          <span style="color:#15803d">Serial:</span> <code style="font-weight:600; font-size:12px">${esc(it.serial_clean || it.serial_raw || "-")}</code>
+          <span style="color:#15803d">ID Gói:</span> <code>${esc(it.package_id || "-")}</code>
+          <span style="color:#15803d">Trạng thái:</span> <span style="font-weight:600">${esc(it.status)}</span>
+          <span style="color:#15803d">Phân loại:</span> <span style="text-transform: capitalize; font-weight:600">${esc(it.category || "-")}</span>
+        </div>
+      `;
+      input.value = ""; 
+      input.focus();
+    } else {
+      const it = res.item;
+      if (res.error && res.error.includes("đã được kiểm kê")) {
+        resultDiv.style.background = "#fef9c3";
+        resultDiv.style.border = "1px solid #fef08a";
+        resultDiv.style.color = "#854d0e";
+        resultDiv.innerHTML = `
+          <div style="font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span> ${esc(res.error)}
+          </div>
+          ${it ? `
+          <div style="font-size: 13.5px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;">
+            <span style="color:#a16207">Sản phẩm:</span> <b>${esc(it.name)}</b>
+            <span style="color:#a16207">Serial:</span> <code style="font-weight:600; font-size:12px">${esc(it.serial_clean || it.serial_raw || "-")}</code>
+            <span style="color:#a16207">ID Gói:</span> <code>${esc(it.package_id || "-")}</code>
+            <span style="color:#a16207">Trạng thái:</span> <span style="font-weight:600">${esc(it.status)}</span>
+            <span style="color:#a16207">Phân loại:</span> <span style="text-transform: capitalize; font-weight:600">${esc(it.category || "-")}</span>
+          </div>
+          ` : ""}
+        `;
+      } else {
+        resultDiv.style.background = "#fef2f2";
+        resultDiv.style.border = "1px solid #fecaca";
+        resultDiv.style.color = "#991b1b";
+        resultDiv.innerHTML = `
+          <div style="font-weight: 800; display: flex; align-items: center; gap: 6px;">
+            <span>❌</span> Lỗi: ${esc(res.error || "Có lỗi xảy ra")}
+          </div>
+        `;
+      }
+    }
+  } catch(e) {
+    resultDiv.style.background = "#fef2f2";
+    resultDiv.style.border = "1px solid #fecaca";
+    resultDiv.style.color = "#991b1b";
+    resultDiv.innerHTML = `
+      <div style="font-weight: 800;">❌ Lỗi kết nối: ${esc(e.message)}</div>
+    `;
+  }
+}
+
 load();
+document.getElementById("serialInput").focus();
 </script>
 </body>
 </html>
