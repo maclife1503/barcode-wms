@@ -7,7 +7,7 @@ ENV_FILE="${ENV_FILE:-/volume2/docker/barcode-wms/.env}"
 IMAGE="${IMAGE:-barcode-wms:ci}"
 NAME="${NAME:-barcode-wms}"
 EXPORTS_VOL="${EXPORTS_VOL:-barcode-wms_exports}"
-PORT="${PORT:-3000}"
+PORT="${PORT:-7777}"
 
 [ -f "$ENV_FILE" ] || { echo "❌ Không thấy ENV_FILE: $ENV_FILE (đặt .env trên Synology)"; exit 1; }
 
