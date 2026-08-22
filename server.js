@@ -288,12 +288,20 @@ function getTgActorName(from) {
 }
 
 // ====== Telegram Alerts ======
-// Telegram fetch với timeout + retry — giảm "miss" khi Render/Telegram network blip.
-// (sendPhoto/sendMessage/sendDocument trước đây nuốt silent mọi lỗi → item có trên
-// web nhưng không gửi được Telegram.)
+// Telegram fetch với timeout + retry AN TOÀN.
+// Lưu ý: các API send* (sendPhoto/sendMessage/sendDocument) KHÔNG idempotent —
+// gửi 2 lần = 2 tin nhắn trùng trong group.
+// Trước đây retry mù mọi lỗi network (kể cả timeout) → có lúc Telegram đã nhận
+// và đăng ảnh thành công nhưng response bị mất, ta gửi lại → group nhận 2 tin
+// trùng trong khi DB chỉ có 1 item.
+// Giờ CHỈ retry khi chắc chắn Telegram chưa gửi:
+//  - Lỗi kết nối trước khi request rời khỏi máy (DNS, connection refused)
+//  - Telegram trả HTTP 429/5xx (từ chối xử lý)
+// Timeout / đứt kết nối giữa chừng → request CÓ THỂ đã thành công → không retry.
 async function tgFetch(url, options = {}) {
   const MAX_ATTEMPTS = 3;
-  const TIMEOUT_MS = 15000;
+  const TIMEOUT_MS = 30000;
+  const SAFE_RETRY_CODES = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"]);
   let lastErr;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const ctrl = new AbortController();
@@ -301,14 +309,23 @@ async function tgFetch(url, options = {}) {
     try {
       const res = await fetch(url, { ...options, signal: ctrl.signal });
       clearTimeout(timer);
+      // 429/5xx: Telegram xác nhận chưa xử lý → retry an toàn
+      if ((res.status === 429 || res.status >= 500) && attempt < MAX_ATTEMPTS) {
+        console.error(`[TELEGRAM] HTTP ${res.status} (lần ${attempt}/${MAX_ATTEMPTS}), retry...`);
+        await new Promise(r => setTimeout(r, 600 * attempt)); // backoff 0.6s, 1.2s
+        continue;
+      }
       return res;
     } catch (e) {
       clearTimeout(timer);
+      const code = e.cause?.code || e.name;
+      const safeToRetry = SAFE_RETRY_CODES.has(code);
+      console.error(`[TELEGRAM] fetch fail (lần ${attempt}/${MAX_ATTEMPTS}): ${code} - ${e.message}` +
+        (safeToRetry ? "" : " | Request có thể đã gửi thành công -> không retry để tránh tin trùng"));
+      if (!safeToRetry) throw e;
       lastErr = e;
-      const reason = e.name === "AbortError" ? `timeout ${TIMEOUT_MS}ms` : e.message;
-      console.error(`[TELEGRAM] fetch fail (lần ${attempt}/${MAX_ATTEMPTS}): ${reason}`);
       if (attempt < MAX_ATTEMPTS) {
-        await new Promise(r => setTimeout(r, 600 * attempt)); // backoff 0.6s, 1.2s
+        await new Promise(r => setTimeout(r, 600 * attempt));
       }
     }
   }
@@ -711,18 +728,26 @@ app.post("/api/external/create", async (req, res) => {
     const token = genToken();
     const t = nowISO();
 
-    await db.execute({
-      sql: `
-        INSERT INTO items (
-          package_id, token, name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
-          status, inventory_status, created_at, updated_at, is_deleted, created_by, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', 'UNKNOWN', ?, ?, 0, 'shortcut', ?)
-      `,
-      args: [
-        package_id, token, fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
-        t, t, detectCategory(fields.name)
-      ]
-    });
+    try {
+      await db.execute({
+        sql: `
+          INSERT INTO items (
+            package_id, token, name, serial_raw, serial_clean, condition, mvd, note, battery, coverage,
+            status, inventory_status, created_at, updated_at, is_deleted, created_by, category
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', 'UNKNOWN', ?, ?, 0, 'shortcut', ?)
+        `,
+        args: [
+          package_id, token, fields.name, fields.serial_raw, fields.serial_clean, fields.condition, fields.mvd, fields.note, fields.battery, fields.coverage,
+          t, t, detectCategory(fields.name)
+        ]
+      });
+    } catch (e) {
+      // Race: 2 request shortcut cùng lúc cùng serial, cùng pass bước check ở trên
+      if (String(e.message || "").toLowerCase().includes("unique")) {
+        return res.status(409).json({ error: "Sản phẩm đã tồn tại." });
+      }
+      throw e;
+    }
 
     const { rows: itemRows } = await db.execute({ sql: "SELECT id FROM items WHERE token = ?", args: [token] });
     const newItem = itemRows[0];
@@ -736,12 +761,13 @@ app.post("/api/external/create", async (req, res) => {
     const linkSuffix = process.env.APP_URL
       ? `\n\n🔗 <a href="${process.env.APP_URL}/scan.html?token=${token}">Xem chi tiết</a>`
       : "";
+    const captionData = {
+      mvd: fields.mvd || "", name: fields.name || "", serial: fields.serial_clean || "",
+      condition: fields.condition || "", battery: fields.battery || "",
+      coverage: fields.coverage || "", note: fields.note || ""
+    };
     const buildCaption = (noteText) => {
-      const data = {
-        mvd: fields.mvd || "", name: fields.name || "", serial: fields.serial_clean || "",
-        condition: fields.condition || "", battery: fields.battery || "",
-        coverage: fields.coverage || "", note: noteText
-      };
+      const data = { ...captionData, note: noteText };
       return `<code>${escTg(JSON.stringify(data))}</code>${linkSuffix}`;
     };
     let captionNote = fields.note || "";
@@ -777,6 +803,12 @@ app.post("/api/external/create", async (req, res) => {
     });
     if (!tgMsg) {
       console.error("[SHORTCUT] Failed to send Telegram photo for token:", token);
+      // Fallback: gửi text (đúng 1 lần) để group vẫn nhận được thông tin
+      // khi ảnh tem nhãn gửi thất bại — thay cho việc retry ảnh (dễ gây tin trùng)
+      await sendTelegramMessage(
+        `⚠️ <b>[SHORTCUT] Gửi tem nhãn thất bại</b>\n📦 ID: <code>${package_id}</code>\n<code>${escTg(JSON.stringify(captionData))}</code>`,
+        process.env.TELEGRAM_CHAT_ID
+      );
     } else {
       console.log("[SHORTCUT] Telegram photo sent successfully, message_id:", tgMsg.message_id);
     }

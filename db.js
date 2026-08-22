@@ -199,6 +199,22 @@ CREATE TABLE IF NOT EXISTS tasks (
     await db.execute("ALTER TABLE items ADD COLUMN post_task_chat_id TEXT");
   } catch(e) { /* ignore */ }
 
+  // Migration: Chống trùng serial trên hàng đang tồn tại.
+  // Race condition: 2 request shortcut chạy song song cùng serial có thể cùng
+  // pass bước check-then-insert trong API → tạo 2 item trùng. Index unique này
+  // (chỉ áp dụng cho hàng chưa xóa, không phân biệt hoa thường) biến race thành
+  // lỗi UNIQUE → API trả 409 "Sản phẩm đã tồn tại".
+  // Nếu dữ liệu cũ đang có serial trùng thì việc tạo index sẽ fail và chỉ log.
+  try {
+    await db.execute(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_items_serial_active
+      ON items(serial_clean COLLATE NOCASE)
+      WHERE is_deleted = 0 AND serial_clean IS NOT NULL AND serial_clean != ''
+    `);
+  } catch (e) {
+    console.error("Không tạo được unique index serial (dữ liệu cũ có thể đang trùng):", e.message);
+  }
+
   // Seed dữ liệu khởi tạo cho category_rules nếu bảng trống
   try {
     const { rows } = await db.execute("SELECT count(*) as count FROM category_rules");
